@@ -171,11 +171,13 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
             assert f'jw02221{field}' in member['expname']
             print(f"DETECTOR PIPELINE on {member['expname']}")
             print("Detector1Pipeline step")
+            detector1_params = {'ramp_fit': {'suppress_one_group':False}, "refpix": {"use_side_ref_pixels": True}}
             Detector1Pipeline.call(member['expname'].replace("_cal.fits",
                                                              "_uncal.fits"),
                                    save_results=True, output_dir=output_dir,
-                                   steps={'ramp_fit': {'suppress_one_group':
-                                                       False}})
+                                   steps=detector1_params
+                                  )
+
             print(f"IMAGE2 PIPELINE on {member['expname']}")
             Image2Pipeline.call(member['expname'].replace("_cal.fits",
                                                           "_rate.fits"),
@@ -193,13 +195,14 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         asn_data['products'][0]['members'] = [row for row in asn_data['products'][0]['members']
                                                 if f'{module}' in row['expname']]
 
-        for member in asn_data['products'][0]['members']:
-            hdr = fits.getheader(member['expname'])
-            if filtername in (hdr['PUPIL'], hdr['FILTER']):
-                outname = destreak(member['expname'],
-                                   use_background_map=True,
-                                   median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
-                member['expname'] = outname
+        ### Removed to see if refpix will fix the 1/f noise
+        #for member in asn_data['products'][0]['members']:
+        #    hdr = fits.getheader(member['expname'])
+        #    if filtername in (hdr['PUPIL'], hdr['FILTER']):
+        #        outname = destreak(member['expname'],
+        #                           use_background_map=True,
+        #                           median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
+        #        member['expname'] = outname
 
         asn_file_each = asn_file.replace("_asn.json", f"_{module}_asn.json")
         with open(asn_file_each, 'w') as fh:
@@ -252,13 +255,14 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
 
-        for member in asn_data['products'][0]['members']:
-            hdr = fits.getheader(member['expname'])
-            if filtername in (hdr['PUPIL'], hdr['FILTER']):
-                outname = destreak(member['expname'],
-                                    use_background_map=True,
-                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
-                member['expname'] = outname
+        ### Removed to see if refpix will fix the 1/f noise
+        #for member in asn_data['products'][0]['members']:
+        #    hdr = fits.getheader(member['expname'])
+        #    if filtername in (hdr['PUPIL'], hdr['FILTER']):
+        #        outname = destreak(member['expname'],
+        #                            use_background_map=True,
+        #                            median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
+        #        member['expname'] = outname
 
         asn_data['products'][0]['name'] = f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-merged'
         asn_file_merged = asn_file.replace("_asn.json", f"_merged_asn.json")
