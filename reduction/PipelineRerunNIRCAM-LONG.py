@@ -118,7 +118,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
 
     products_fits = Observations.filter_products(data_products_by_obs, extension="fits")
     print("products_fits length:", len(products_fits))
-    uncal_mask = np.array([uri.endswith('_uncal.fits') and f'jw02221-{field}' in uri for uri in products_fits['dataURI']])
+    uncal_mask = np.array([uri.endswith('_uncal.fits') and f'jw02221{field}' in uri for uri in products_fits['dataURI']])
     uncal_mask &= products_fits['productType'] == 'SCIENCE'
     print("uncal length:", (uncal_mask.sum()))
 
@@ -332,8 +332,8 @@ if __name__ == "__main__":
 
     field_to_reg_mapping = {'001': 'brick', '002': 'cloudc'}
 
-    #for field in fields:
-    for field in ('001',):
+    for field in fields:
+    #for field in ('001',):
         for filtername in filternames:
             for module in modules:
                 print(f"Main Loop: {filtername} + {module} + {field}")
