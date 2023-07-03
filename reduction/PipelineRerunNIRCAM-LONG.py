@@ -11,6 +11,7 @@ from astropy import log
 from astropy.io import ascii, fits
 from astropy.utils.data import download_file
 from astropy.visualization import ImageNormalize, ManualInterval, LogStretch, LinearStretch
+from astropy.table import Table
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
@@ -31,7 +32,7 @@ from jwst import datamodels
 from jwst.associations import asn_from_list
 from jwst.associations.lib.rules_level3_base import DMS_Level3_Base
 
-from align_to_catalogs import realign_to_vvv, merge_a_plus_b, retrieve_vvv
+from align_to_catalogs import realign_to_vvv, realign_to_catalog, merge_a_plus_b, retrieve_vvv
 from saturated_star_finding import iteratively_remove_saturated_stars, remove_saturated_stars
 
 from destreak import destreak
@@ -57,13 +58,18 @@ basepath = '/orange/adamginsburg/jwst/brick/'
 def main(filtername, module, Observations=None, regionname='brick', field='001'):
     log.info(f"Processing filter {filtername} module {module}")
 
+    basepath = f'/orange/adamginsburg/jwst/{regionname}/'
+    fwhm_tbl = Table.read(f'{basepath}/reduction/fwhm_table.ecsv')
+    row = fwhm_tbl[fwhm_tbl['Filter'] == filtername]
+    fwhm = fwhm_arcsec = float(row['PSF FWHM (arcsec)'][0])
+    fwhm_pix = float(row['PSF FWHM (pixel)'][0])
+
     # sanity check
     if regionname == 'brick':
         assert field == '001'
     elif regionname == 'cloudc':
         assert field == '002'
 
-    basepath = f'/orange/adamginsburg/jwst/{regionname}/'
     os.environ["CRDS_PATH"] = f"{basepath}/crds/"
     os.environ["CRDS_SERVER_URL"] = "https://jwst-crds.stsci.edu"
     mpl.rcParams['savefig.dpi'] = 80
@@ -208,23 +214,55 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         with open(asn_file_each, 'w') as fh:
             json.dump(asn_data, fh)
 
-        vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-{module}_vvvcat.ecsv')
-        print(f"Loaded VVV catalog {vvvdr2fn}")
+
         fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
-                       'cloudc': 'regions/nircam_cloudc_fov.reg',
-                       }
-        if not os.path.exists(vvvdr2fn):
-            retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module=module)
-        tweakreg_parameters['abs_refcat'] = vvvdr2fn
-        tweakreg_parameters['abs_searchrad'] = 1
+                      'cloudc': 'regions/nircam_cloudc_fov.reg',
+                      }
+        abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv'
+        reftbl = Table.read(abs_refcat)
+
+        if filtername.lower() == 'f405n':
+        # for the VVV cat, use the merged version: no need for independent versions
+            abs_refcat = vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-merged_vvvcat.ecsv')
+            print(f"Loaded VVV catalog {vvvdr2fn}")
+            if not os.path.exists(vvvdr2fn):
+                retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module='merged', fieldnumber=field)
+            tweakreg_parameters['abs_refcat'] = vvvdr2fn
+            tweakreg_parameters['abs_searchrad'] = 1
+        else:
+            # For non-F410M, try aligning to F410M instead of VVV?
+            reftblversion = reftbl.meta['VERSION']
+
+            # truncate to top 10,000 sources
+            reftbl[:10000].write(f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv', overwrite=True)
+            abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv'
+
+            tweakreg_parameters['abs_searchrad'] = 0.4
+            # try forcing searchrad to be tighter to avoid bad crossmatches
+            # (the raw data are very well-aligned to begin with, though CARTA
+            # can't display them b/c they are using SIP)
+            tweakreg_parameters['searchrad'] = 0.05
+            print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
 
         tweakreg_parameters.update({'fitgeometry': 'general',
-                                    'brightest': 10000,
-                                    'snr_threshold': 5,
-                                    'abs_refcat': vvvdr2fn,
-                                    'nclip': 1,
+                                    # brightest = 5000 was causing problems- maybe the cross-alignment was getting caught on PSF artifacts?
+                                    'brightest': 500,
+                                    'snr_threshold': 30, # was 5, but that produced too many stars
+                                    'abs_refcat': abs_refcat,
+                                    'save_catalogs': True,
+                                    'catalog_format': 'ecsv',
+                                    'kernel_fwhm': fwhm_pix,
+                                    'nclip': 5,
+                                    # based on DebugReproduceTweakregStep
+                                    'sharplo': 0.3,
+                                    'sharphi': 0.9,
+                                    'roundlo': -0.25,
+                                    'roundhi': 0.25,
+                                    'separation': 0.5, # minimum separation; default is 1
+                                    # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
                                     })
 
+        log.info(f"Running tweakreg ({module})")
         calwebb_image3.Image3Pipeline.call(
             asn_file_each,
             steps={'tweakreg': tweakreg_parameters,},
@@ -233,19 +271,43 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         print(f"DONE running {asn_file_each}")
 
         log.info(f"Realigning to VVV (module={module}")
-        realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module)
+        realigned_vvv_filename = f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-vvv.fits'
+        shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
+                    realigned_vvv_filename)
+        realigned = realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field,
+                                   imfile=realigned_vvv_filename, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15)
 
-        log.info("Removing saturated stars")
+        log.info(f"Realigning to refcat (module={module}")
+        realigned_refcat_filename = f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-refcat.fits'
+        shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
+                    realigned_refcat_filename)
+        realigned = realign_to_catalog(reftbl['skycoord'],
+                                       filtername=filtername.lower(),
+                                       basepath=basepath, module=module,
+                                       fieldnumber=field,
+                                       mag_limit=20,
+                                       imfile=realigned_refcat_filename)
+
+        log.info(f"Removing saturated stars.  cwd={os.getcwd()}")
         try:
             remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits')
+            remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-vvv.fits')
         except (TimeoutError, requests.exceptions.ReadTimeout) as ex:
             print("Failed to run remove_saturated_stars with failure {ex}")
+
 
     if module == 'nrcb':
         # assume nrca is run before nrcb
         print("Merging already-combined nrca + nrcb modules")
-        merge_a_plus_b(filtername)
+        merge_a_plus_b(filtername, fieldnumber=field, suffix='realigned-to-refcat')
         print("DONE Merging already-combined nrca + nrcb modules")
+
+        #try:
+        #    # this is probably wrong / has wrong path names.
+        #    remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}-reproject_i2d.fits')
+        #    remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-vvv.fits')
+        #except (TimeoutError, requests.exceptions.ReadTimeout) as ex:
+        #    print("Failed to run remove_saturated_stars with failure {ex}")
 
     if module == 'merged':
         # try merging all frames & modules
@@ -255,36 +317,62 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
 
-        ### Removed to see if refpix will fix the 1/f noise
-        #for member in asn_data['products'][0]['members']:
-        #    hdr = fits.getheader(member['expname'])
-        #    if filtername in (hdr['PUPIL'], hdr['FILTER']):
-        #        outname = destreak(member['expname'],
-        #                            use_background_map=True,
-        #                            median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
-        #        member['expname'] = outname
+        for member in asn_data['products'][0]['members']:
+            hdr = fits.getheader(member['expname'])
+            if filtername in (hdr['PUPIL'], hdr['FILTER']):
+                outname = destreak(member['expname'],
+                                   use_background_map=True,
+                                   median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
+                member['expname'] = outname
 
         asn_data['products'][0]['name'] = f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-merged'
         asn_file_merged = asn_file.replace("_asn.json", f"_merged_asn.json")
         with open(asn_file_merged, 'w') as fh:
             json.dump(asn_data, fh)
 
-        vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-{module}_vvvcat.ecsv')
-        print(f"Loaded VVV catalog {vvvdr2fn}")
+        abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv'
+        reftbl = Table.read(abs_refcat)
+        reftblversion = reftbl.meta['VERSION']
+
         fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
                        'cloudc': 'regions/nircam_cloudc_fov.reg',
-                       }
-        if not os.path.exists(vvvdr2fn):
-            retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module=module)
-        tweakreg_parameters['abs_refcat'] = vvvdr2fn
-        tweakreg_parameters['abs_searchrad'] = 1
+                      }
+        if filtername.lower() == 'f405n':
+            vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-{module}_vvvcat.ecsv')
+            print(f"Loaded VVV catalog {vvvdr2fn}")
+            if not os.path.exists(vvvdr2fn):
+                retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module=module, fieldnumber=field)
+            tweakreg_parameters['abs_refcat'] = abs_refcat = vvvdr2fn
+            tweakreg_parameters['abs_searchrad'] = 1
+        else:
+            # For non-F410M, try aligning to F410M instead of VVV?
+            abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv'
+
+            # truncate to top 10,000 sources
+            reftbl[:10000].write(f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv', overwrite=True)
+            abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv'
+
+            tweakreg_parameters['abs_searchrad'] = 0.4
+            tweakreg_parameters['searchrad'] = 0.05
+            print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
+
 
         tweakreg_parameters.update({'fitgeometry': 'general',
-                                    'brightest': 10000,
-                                    'snr_threshold': 5,
-                                    'nclip': 1,
+                                    'brightest': 500,
+                                    'snr_threshold': 30,
+                                    'abs_refcat': abs_refcat,
+                                    'save_catalogs': True,
+                                    'catalog_format': 'ecsv',
+                                    'kernel_fwhm': fwhm_pix,
+                                    'nclip': 5,
+                                    'sharplo': 0.3,
+                                    'sharphi': 0.9,
+                                    'roundlo': -0.25,
+                                    'roundhi': 0.25,
+                                    'separation': 0.5, # minimum separation; default is 1
                                     })
 
+        log.info("Running tweakreg (merged)")
         calwebb_image3.Image3Pipeline.call(
             asn_file,
             steps={'tweakreg': tweakreg_parameters,},
@@ -292,12 +380,28 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
             save_results=True)
         print(f"DONE running {asn_file_merged}")
 
-        log.info("Realigning to VVV (module=merged)")
-        realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module='merged')
+        log.info(f"Realigning to VVV (module={module}")
+        realigned_vvv_filename = f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-vvv.fits'
+        shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
+                    realigned_vvv_filename)
+        realigned = realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field,
+                                   imfile=realigned_vvv_filename, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15)
 
-        log.info("Removing saturated stars")
+        log.info(f"Realigning to refcat (module={module}")
+        realigned_refcat_filename = f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-refcat.fits'
+        shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
+                    realigned_refcat_filename)
+        realigned = realign_to_catalog(reftbl['skycoord'],
+                                       filtername=filtername.lower(),
+                                       basepath=basepath, module=module,
+                                       fieldnumber=field,
+                                       mag_limit=20,
+                                       imfile=realigned_refcat_filename)
+
+        log.info(f"Removing saturated stars.  cwd={os.getcwd()}")
         try:
             remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-merged_i2d.fits')
+            remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-vvv.fits')
         except (TimeoutError, requests.exceptions.ReadTimeout) as ex:
             print("Failed to run remove_saturated_stars with failure {ex}")
 
@@ -333,7 +437,6 @@ if __name__ == "__main__":
     field_to_reg_mapping = {'001': 'brick', '002': 'cloudc'}
 
     for field in fields:
-    #for field in ('001',):
         for filtername in filternames:
             for module in modules:
                 print(f"Main Loop: {filtername} + {module} + {field}")

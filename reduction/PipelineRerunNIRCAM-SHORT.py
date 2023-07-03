@@ -116,7 +116,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
 
     products_fits = Observations.filter_products(data_products_by_obs, extension="fits")
     print("products_fits length:", len(products_fits))
-    uncal_mask = np.array([uri.endswith('_uncal.fits') and f'jw02221-{field}' in uri for uri in products_fits['dataURI']])
+    uncal_mask = np.array([uri.endswith('_uncal.fits') and f'jw02221{field}' in uri for uri in products_fits['dataURI']])
     uncal_mask &= products_fits['productType'] == 'SCIENCE'
     print("uncal length:", (uncal_mask.sum()))
 
@@ -177,7 +177,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                 save_results=True, output_dir=output_dir,
                                )
 
-    if module in ('nrca', 'nrcb'):
+    if module in ('nrca', 'nrcb',):
         print(f"Filter {filtername} module {module} ")
 
         with open(asn_file) as f_obj:
@@ -200,7 +200,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
             json.dump(asn_data, fh)
 
         # reference to long-wavelength catalogs
-        abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-long_reference_astrometric_catalog.ecsv'
+        abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv'
         reftbl = Table.read(abs_refcat)
         reftblversion = reftbl.meta['VERSION']
         print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
@@ -210,7 +210,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         # image3.tweakreg.tolerance = 0.3 # max tolerance 0.2 instead of 0.7
 
         tweakreg_parameters.update({'fitgeometry': 'general',
-                                    'brightest': 2000,
+                                    'brightest': 500,
                                     'snr_threshold': 15,
                                     'peakmax': 1400,
                                     'nclip': 7,
@@ -219,6 +219,10 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'abs_refcat': abs_refcat,
                                     'separation': 0.5,
                                     'tolerance': 0.3,
+                                    'sharplo': 0.3,
+                                    'sharphi': 0.9,
+                                    'roundlo': -0.25,
+                                    'roundhi': 0.25,
                                              })
 
         calwebb_image3.Image3Pipeline.call(
@@ -232,23 +236,29 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         # are useful
         realigned = realign_to_catalog(reftbl['skycoord_f410m'],
                                        filtername=filtername.lower(),
-                                       module=module)
+                                       module=module,
+                                       fieldnumber=field)
+        realigned.writeto(f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-refcat.fits', overwrite=True)
 
         with fits.open(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits', mode='update') as fh:
             fh[0].header['V_REFCAT'] = reftblversion
 
         log.info("Removing saturated stars")
         remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits')
+        remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-refcat.fits')
 
 
-    if module in ('nrcb', 'merged'):
+    if module in ('nrcb', ):
+        # June 30, 2023: previously, this was also being done for 'merged', but it timed out at that step, which appears to take >3 days
         # assume nrca is run before nrcb
         print("Merging already-combined nrca + nrcb modules", flush=True)
         merge_a_plus_b(filtername)
         print("DONE Merging already-combined nrca + nrcb modules")
 
     if module == 'merged':
-        raise ValueError("Don't try merging on disk any more, instead do the merging the other way.")
+        # May 31, 2023: commented this out to see if the problem was a memory problem or something else
+        # it's not clear this code hsa ever been used or even makes sense.  But maybe?
+        # raise ValueError("Don't try merging on disk any more, instead do the merging the other way.")
         print(f"Filter {filtername} module = merged nrca + nrcb ")
         log.info("Running merged frames")
         # try merging all frames & modules
@@ -281,14 +291,14 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         # else:
         #     print(f"Did not find VVV catalog {vvvdr2fn}")
 
-        abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-long_reference_astrometric_catalog.ecsv'
+        abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv'
 
         #image3.tweakreg.searchrad = 1 # 1 arcsec instead of 2
         #image3.tweakreg.separation = 0.6 # min separation 0.4 arcsec instead of 1 (Mihai suggesteed separation = 2x tolerance)
         #image3.tweakreg.tolerance = 0.3 # max tolerance 0.2 instead of 0.7
 
         tweakreg_parameters.update({'fitgeometry': 'general',
-                                    'brightest': 2000,
+                                    'brightest': 500,
                                     'snr_threshold': 15,
                                     'peakmax': 1400,
                                     'nclip': 7,
@@ -297,24 +307,37 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'abs_refcat': abs_refcat,
                                     'separation': 0.6,
                                     'tolerance': 0.3,
+                                    'sharplo': 0.3,
+                                    'sharphi': 0.9,
+                                    'roundlo': -0.25,
+                                    'roundhi': 0.25,
                                    })
 
         calwebb_image3.Image3Pipeline.call(
-            asn_file_each,
+            asn_file_merged,
             steps={'tweakreg': tweakreg_parameters,},
             output_dir=output_dir,
             save_results=True)
         print(f"DONE running {asn_file_merged}")
 
+
+        abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv'
+        reftbl = Table.read(abs_refcat)
+        reftblversion = reftbl.meta['VERSION']
+        print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
+
         realigned = realign_to_catalog(reftbl['skycoord_f410m'],
                                        filtername=filtername.lower(),
-                                       module=module)
+                                       module=module,
+                                       fieldnumber=field)
+        realigned.writeto(f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-refcat.fits', overwrite=True)
 
         with fits.open(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits', mode='update') as fh:
             fh[0].header['V_REFCAT'] = reftblversion
 
         log.info("Removing saturated stars")
         remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-merged_i2d.fits')
+        remove_saturated_stars(f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-refcat.fits')
 
 
     globals().update(locals())

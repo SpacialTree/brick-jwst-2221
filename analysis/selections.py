@@ -38,6 +38,7 @@ from astropy import units as u
 
 from analysis_setup import (basepath, reg, regzoom, distance_modulus,
                             filternames, basetable, plot_tools, basetable,
+                            basetable_merged_reproject,
                             basetable_merged, basetable_nrca, basetable_nrcb,
                             )
 from plot_tools import regzoomplot, starzoom
@@ -114,6 +115,7 @@ def main(basetable, ww):
     print(f"Of {len(all_good)} rows, {all_good.sum()} are good in all filters.")
     print(f"Of {len(all_good)} rows, {long_good.sum()} are good in long filters.")
     print(f"Of {len(all_good)} rows, {short_good.sum()} are good in short filters.")
+    print(f"Of {len(all_good)} rows, {any_good.sum()} are good in at least one filter.")
 
     goodqflong = ((basetable['qf_f410m'] > minqf) & (basetable['qf_f405n'] > minqf) & (basetable['qf_f466n'] > minqf))
     goodspreadlong = ((basetable['spread_model_f410m'] < maxspread) | (basetable['spread_model_f405n'] < maxspread) | (basetable['spread_model_f466n'] < maxspread))
@@ -256,7 +258,7 @@ def main(basetable, ww):
     badblue = blue_410_466 & ( ((basetable['mag_ab_f405n'] - basetable['mag_ab_f410m']) > 2) |
                               ((basetable['mag_ab_f410m'] - basetable['mag_ab_f466n']) > -1) )
 
-    globals().update(locals())
+    return locals()
 
 if __name__ == "__main__":
     from optparse import OptionParser
@@ -267,15 +269,31 @@ if __name__ == "__main__":
 
     print(f"Selecting module {options.module}")
 
+    # save nrca and nrcb result tables
+    from analysis_setup import fh_nrca as fh, ww410_nrca as ww410, ww410_nrca as ww
+    result = main(basetable_nrca, ww=ww)
+    globals().update({key+"_a": val for key, val in result.items()})
+    from analysis_setup import fh_nrcb as fh, ww410_nrcb as ww410, ww410_nrcb as ww
+    result = main(basetable_nrcb, ww=ww)
+    globals().update({key+"_b": val for key, val in result.items()})
+
     if options.module == 'nrca':
         from analysis_setup import fh_nrca as fh, ww410_nrca as ww410, ww410_nrca as ww
-        main(basetable_nrca, ww=ww)
+        result = main(basetable_nrca, ww=ww)
+        globals().update(result)
         basetable = basetable_nrca
     elif options.module == 'nrcb':
         from analysis_setup import fh_nrcb as fh, ww410_nrcb as ww410, ww410_nrcb as ww
-        main(basetable_nrcb, ww=ww)
+        result = main(basetable_nrcb, ww=ww)
+        globals().update(result)
         basetable = basetable_nrcb
     elif options.module == 'merged':
         from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
-        main(basetable_merged, ww=ww)
+        result = main(basetable_merged, ww=ww)
+        globals().update(result)
         basetable = basetable_merged
+    elif options.module == 'merged-reproject':
+        from analysis_setup import fh_merged_reproject as fh, ww410_merged_reproject as ww410, ww410_merged_reproject as ww
+        result = main(basetable_merged_reproject, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged_reproject
