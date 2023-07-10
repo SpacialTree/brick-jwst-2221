@@ -29,8 +29,12 @@ pl.rcParams['figure.dpi'] = 100
 basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 
+
+def getmtime(x):
+    return datetime.datetime.fromtimestamp(os.path.getmtime(x)).strftime('%Y-%m-%d %H:%M:%S')
+
 def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
-                   ref_filter='f410m',
+                   ref_filter='f405n',
                    max_offset=0.15*u.arcsec):
     basetable = [tb for tb in tbls if tb.meta['filter'] == ref_filter][0].copy()
     basetable.meta['astrometric_reference_wavelength'] = ref_filter
@@ -44,7 +48,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         matches, sep, _ = crds.match_to_catalog_sky(basecrds, nthneighbor=1)
         newcrds = crds[sep > max_offset]
         basecrds = SkyCoord([basecrds, newcrds])
-    print(f"Base coordinate lenth = {len(basecrds)}")
+    print(f"Base coordinate length = {len(basecrds)}")
 
     basetable = Table()
     basetable['skycoord_ref'] = basecrds
@@ -176,6 +180,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
 
 
 def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False):
+    print()
     imgfns = [x
           for filn in filternames
           for x in glob.glob(f"{basepath}/{filn.upper()}/pipeline/"
@@ -192,6 +197,8 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False):
              ]
     if len(catfns) != 6:
         raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
+    for catfn in catfns:
+        print(catfn, getmtime(catfn))
     tbls = [Table.read(catfn) for catfn in catfns]
 
     for catfn, tbl in zip(catfns, tbls):
@@ -231,7 +238,9 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False):
         if hasattr(tbl['flux'], 'mask'):
             print(f'ab mag has mask sum = {tbl["flux"].mask.sum()} masked values')
 
-    merge_catalogs(tbls, catalog_type=f'crowdsource{suffix}', module=module)
+    merge_catalogs(tbls,
+                   catalog_type=f'crowdsource{suffix}{"_desat" if desat else ""}{"_bgsub" if bgsub else ""}',
+                   module=module)
 
 
 def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False, bgsub=False):
@@ -284,12 +293,12 @@ def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False,
         with np.errstate(all='ignore'):
             flux_jy = (flux * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * fwhm_arcsec**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
             abmag = flux_jy.to(u.ABmag)
-            #eflux_jy = (tbl['dflux'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * tbl['fwhm']**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
-            #abmag_err = 2.5 / np.log(10) * eflux_jy / flux_jy
+            eflux_jy = (tbl['flux_unc'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * fwhm_arcsec**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
+            abmag_err = 2.5 / np.log(10) * eflux_jy / flux_jy
         tbl.add_column(flux_jy, name='flux_jy')
         tbl.add_column(abmag, name='mag_ab')
-        #tbl.add_column(eflux_jy, name='eflux_jy')
-        #tbl.add_column(abmag_err, name='emag_ab')
+        tbl.add_column(eflux_jy, name='eflux_jy')
+        tbl.add_column(abmag_err, name='emag_ab')
 
     merge_catalogs(tbls, catalog_type=daophot_type, module=module)
 
@@ -391,7 +400,7 @@ def replace_saturated(cat, filtername, radius=None):
         # DAOPHOT
         cat['flux_fit'][idx_cat] = satstar_cat['flux_fit'][idx_sat]
         cat['flux_unc'][idx_cat] = satstar_cat['flux_unc'][idx_sat]
-        cat['skycoord_fit'][idx_cat] = satstar_cat['skycoord_fit'][idx_sat]
+        cat['skycoord'][idx_cat] = satstar_cat['skycoord_fit'][idx_sat]
         cat['x_fit'][idx_cat] = satstar_cat['x_fit'][idx_sat]
         cat['y_fit'][idx_cat] = satstar_cat['y_fit'][idx_sat]
         cat['x_0_unc'][idx_cat] = satstar_cat['x_0_unc'][idx_sat]
@@ -405,6 +414,9 @@ def replace_saturated(cat, filtername, radius=None):
         satstar_not_inc[idx_sat] = False
         satstar_toadd = satstar_cat[satstar_not_inc]
 
+        satstar_toadd.rename_column('skycoord_fit', 'skycoord')
+        satstar_toadd['skycoord_centroid'] = satstar_toadd['skycoord']
+
         for colname in cat.colnames:
             if colname not in satstar_toadd.colnames:
                 satstar_toadd.add_column(np.ones(len(satstar_toadd))*np.nan, name=colname)
@@ -412,6 +424,8 @@ def replace_saturated(cat, filtername, radius=None):
             if colname not in cat.colnames:
                 satstar_toadd.remove_column(colname)
 
+        #print("cat colnames: ",cat.colnames)
+        #print("satstar toadd_colnames: ",satstar_toadd.colnames)
         for row in satstar_toadd:
             cat.add_row(dict(row))
 
@@ -424,6 +438,7 @@ def replace_saturated(cat, filtername, radius=None):
           f"{satstar_not_inc.sum()} are newly added.  The total replaced stars={replaced_sat_.sum()}")
 
     cat.add_column(replaced_sat_, name='replaced_saturated')
+    cat.rename_column('flux_fit', 'flux')
     # DEBUG print(f"DEBUG: cat['replaced_saturated'].sum(): {cat['replaced_saturated'].sum()}")
 
 def main():
@@ -442,17 +457,17 @@ def main():
                         print(f'crowdsource {suffix} {module}')
                         merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub)
                 except Exception as ex:
-                    print(ex)
+                    print(f"Exception: {ex}")
                 try:
                     print(f'daophot basic {module}')
                     merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub)
                 except Exception as ex:
-                    print(ex)
+                    print(f"Exception: {ex}")
                 try:
                     print(f'daophot iterative {module}')
                     merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub)
                 except Exception as ex:
-                    print(ex)
+                    print(f"Exception: {ex}")
                 print()
 
 if __name__ == "__main__":
