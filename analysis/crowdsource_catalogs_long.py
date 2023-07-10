@@ -47,7 +47,9 @@ def print(*args, **kwargs):
 
 print("Done with imports", flush=True)
 
-basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
+basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
+
+field = '002'
 
 class WrappedPSFModel(crowdsource.psf.SimplePSF):
     """
@@ -195,11 +197,11 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
             try:
                 pupil = 'clear'
-                filename = f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
+                filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
                 fh = fits.open(filename)
             except Exception:
                 pupil = 'F444W'
-                filename = f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
+                filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
                 fh = fits.open(filename)
             print(f"Starting on {filename}", flush=True)
 
@@ -370,18 +372,18 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             try:
                 catalog_zoom_diagnostic(data, modsky, nullslice, stars)
                 pl.suptitle(f"daofind Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}")
-                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daofind.png',
+                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daofind.png',
                         bbox_inches='tight')
 
                 catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                 pl.suptitle(f"daofind Catalog Diagnostics {filtername} {module}{desat}{bgsub}")
-                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daofind.png',
+                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daofind.png',
                         bbox_inches='tight')
 
                 for name, zoomcut in zoomcut_list.items():
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                     pl.suptitle(f"daofind Catalog Diagnostics {filtername} {module}{desat}{bgsub} zoom {name}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom{name.replace(" ","_")}_daofind.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom{name.replace(" ","_")}_daofind.png',
                             bbox_inches='tight')
             except Exception as ex:
                 print(f'FAILURE: {ex}')
@@ -433,17 +435,17 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             try:
                 catalog_zoom_diagnostic(data, modsky, nullslice, stars)
                 pl.suptitle(f"Crowdsource nsky=1 unweighted Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}")
-                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_unweighted.png',
+                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_unweighted.png',
                         bbox_inches='tight')
 
                 catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                 pl.suptitle(f"Crowdsource nsky=1 unweighted Catalog Diagnostics {filtername} {module}{desat}{bgsub}")
-                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_unweighted.png',
+                pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_unweighted.png',
                         bbox_inches='tight')
                 for name, zoomcut in zoomcut_list.items():
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                     pl.suptitle(f"Crowdsource nsky=1 Catalog Diagnostics {filtername} {module}{desat}{bgsub} zoom {name}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom{name.replace(" ","_")}_unweighted.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom{name.replace(" ","_")}_unweighted.png',
                             bbox_inches='tight')
             except Exception as ex:
                 print(f'FAILURE: {ex}')
@@ -470,7 +472,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             fig.clf()
             ax = fig.gca()
             im = ax.imshow(weight, norm=simple_norm(weight, stretch='log')); pl.colorbar(mappable=im);
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_weights.png',
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_weights.png',
                     bbox_inches='tight')
 
             # t0 = time.time()
@@ -543,18 +545,18 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
                     catalog_zoom_diagnostic(data, modsky, nullslice, stars)
                     pl.suptitle(f"Catalog Diagnostics {filtername} {module}{desat}{bgsub}{fpsf} nsky={nsky} weighted")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics.png',
                             bbox_inches='tight')
 
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                     pl.suptitle(f"Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}{fpsf} nsky={nsky} weighted")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics_zoom.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics_zoom.png',
                             bbox_inches='tight')
 
                     for name, zoomcut in zoomcut_list.items():
                         catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                         pl.suptitle(f"Crowdsource nsky={nsky} weighted Catalog Diagnostics {filtername} {module}{desat}{bgsub}{fpsf} zoom {name}")
-                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics_zoom{name.replace(" ","_")}.png',
+                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics_zoom{name.replace(" ","_")}.png',
                                 bbox_inches='tight')
 
 
@@ -588,18 +590,18 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                 try:
                     catalog_zoom_diagnostic(data, modsky, nullslice, stars)
                     pl.suptitle(f"daophot basic Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daophot_basic.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daophot_basic.png',
                             bbox_inches='tight')
 
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                     pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daophot_basic.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daophot_basic.png',
                             bbox_inches='tight')
 
                     for name, zoomcut in zoomcut_list.items():
                         catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                         pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{desat}{bgsub} zoom {name}")
-                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}__catalog_diagnostics_zoom_daophot_basic{name.replace(" ","_")}.png',
+                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}__catalog_diagnostics_zoom_daophot_basic{name.replace(" ","_")}.png',
                                 bbox_inches='tight')
                 except Exception as ex:
                     print(f'FAILURE: {ex}')
@@ -628,18 +630,18 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                 try:
                     catalog_zoom_diagnostic(data, modsky, nullslice, stars)
                     pl.suptitle(f"daophot iterative Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daophot_iterative.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daophot_iterative.png',
                             bbox_inches='tight')
 
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                     pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daophot_iterative.png',
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daophot_iterative.png',
                             bbox_inches='tight')
 
                     for name, zoomcut in zoomcut_list.items():
                         catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
                         pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{desat}{bgsub} zoom {name}")
-                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}__catalog_diagnostics_zoom_daophot_iterative{name.replace(" ","_")}.png',
+                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}__catalog_diagnostics_zoom_daophot_iterative{name.replace(" ","_")}.png',
                                 bbox_inches='tight')
                 except Exception as ex:
                     print(f'FAILURE: {ex}')

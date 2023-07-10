@@ -201,14 +201,13 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         asn_data['products'][0]['members'] = [row for row in asn_data['products'][0]['members']
                                                 if f'{module}' in row['expname']]
 
-        ### Removed to see if refpix will fix the 1/f noise
-        #for member in asn_data['products'][0]['members']:
-        #    hdr = fits.getheader(member['expname'])
-        #    if filtername in (hdr['PUPIL'], hdr['FILTER']):
-        #        outname = destreak(member['expname'],
-        #                           use_background_map=True,
-        #                           median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
-        #        member['expname'] = outname
+        for member in asn_data['products'][0]['members']:
+            hdr = fits.getheader(member['expname'])
+            if filtername in (hdr['PUPIL'], hdr['FILTER']):
+                outname = destreak(member['expname'],
+                                   use_background_map=True,
+                                   median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
+                member['expname'] = outname
 
         asn_file_each = asn_file.replace("_asn.json", f"_{module}_asn.json")
         with open(asn_file_each, 'w') as fh:
@@ -223,7 +222,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
 
         if filtername.lower() == 'f405n':
         # for the VVV cat, use the merged version: no need for independent versions
-            abs_refcat = vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-merged_vvvcat.ecsv')
+            abs_refcat = vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-merged_vvvcat.ecsv') # file needed by crowdsource_catalogs_long
             print(f"Loaded VVV catalog {vvvdr2fn}")
             if not os.path.exists(vvvdr2fn):
                 retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module='merged', fieldnumber=field)

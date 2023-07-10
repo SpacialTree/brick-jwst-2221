@@ -41,7 +41,7 @@ import webbpsf
 
 print("Completed imports", flush=True)
 
-basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
+basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
 
 from optparse import OptionParser
 parser = OptionParser()

@@ -5,11 +5,11 @@ from astropy.table import Table
 
 
 
-def main():
+def main(basepath = '/orange/adamginsburg/jwst/cloudc/'):
     """
     June 28, 2023: decided to switch to F405N-only reference
     """
-    basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
+    #basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 
     tblfilename = (f'{basepath}/F405N/f405n_merged-reproject_crowdsource_nsky0.fits')
     tbl = Table.read(tblfilename)
@@ -37,7 +37,7 @@ def main():
 
 
 def main_old():
-    basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
+    basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
     long_filternames = ['f410m', 'f405n', 'f466n']
 
     # filtername = 'F410M'

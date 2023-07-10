@@ -186,14 +186,13 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         asn_data['products'][0]['members'] = [row for row in asn_data['products'][0]['members']
                                             if f'{module}' in row['expname']]
 
-        ### Removed to see if refpix will fix the 1/f noise
-        #for member in asn_data['products'][0]['members']:
-        #    hdr = fits.getheader(member['expname'])
-        #    if filtername in (hdr['PUPIL'], hdr['FILTER']):
-        #        # changed filter size to be maximal now that we're using the background
-        #        outname = destreak(member['expname'], median_filter_size=2048,
-        #                            use_background_map=True)  # medfilt_size[filtername])
-        #        member['expname'] = outname
+        for member in asn_data['products'][0]['members']:
+            hdr = fits.getheader(member['expname'])
+            if filtername in (hdr['PUPIL'], hdr['FILTER']):
+                # changed filter size to be maximal now that we're using the background
+                outname = destreak(member['expname'], median_filter_size=2048,
+                                    use_background_map=True)  # medfilt_size[filtername])
+                member['expname'] = outname
 
         asn_file_each = asn_file.replace("_asn.json", f"_{module}_alldetectors_asn.json")
         with open(asn_file_each, 'w') as fh:
