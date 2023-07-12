@@ -374,7 +374,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
 
         log.info("Running tweakreg (merged)")
         calwebb_image3.Image3Pipeline.call(
-            asn_file,
+            asn_file_merged,
             steps={'tweakreg': tweakreg_parameters,},
             output_dir=output_dir,
             save_results=True)
