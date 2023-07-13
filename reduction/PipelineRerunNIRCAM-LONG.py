@@ -222,8 +222,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         # for the VVV cat, use the merged version: no need for independent versions
             abs_refcat = vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-merged_vvvcat.ecsv') # file needed by crowdsource_catalogs_long
             print(f"Loaded VVV catalog {vvvdr2fn}")
-            if not os.path.exists(vvvdr2fn):
-                retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module='merged', fieldnumber=field)
+            retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module='merged', fieldnumber=field)
             tweakreg_parameters['abs_refcat'] = vvvdr2fn
             tweakreg_parameters['abs_searchrad'] = 1
             assert 'skycoord' in reftbl.colnames
@@ -337,8 +336,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         if filtername.lower() == 'f405n':
             vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-{module}_vvvcat.ecsv')
             print(f"Loaded VVV catalog {vvvdr2fn}")
-            if not os.path.exists(vvvdr2fn):
-                retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module=module, fieldnumber=field)
+            retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module=module, fieldnumber=field)
             tweakreg_parameters['abs_refcat'] = abs_refcat = vvvdr2fn
             tweakreg_parameters['abs_searchrad'] = 1
             reftbl = Table.read(abs_refcat)
