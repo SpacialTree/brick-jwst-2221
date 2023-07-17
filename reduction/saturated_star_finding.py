@@ -140,7 +140,7 @@ def get_psf(header, path_prefix='.'):
     psfgen.filter = filtername
     obsdate = header['DATE-OBS']
 
-    with open(os.path.expanduser('/home/adamginsburg/.mast_api_token'), 'r') as fh:
+    with open(os.path.expanduser('~/.mast_api_token'), 'r') as fh:
         api_token = fh.read().strip()
     from astroquery.mast import Mast
 
@@ -333,7 +333,7 @@ def iteratively_remove_saturated_stars(data, header,
 
         # manually subtract off PSFs because get_residual_image seems to (never?) work
         # (it might work but I just had other errors masking that it was working, but this is fine - it's just more manual steps)
-        resid = subtract_psf(resid, phot.psf_model, result['x_fit', 'y_fit', 'flux_fit'], subshape=phot.fitshape)
+        resid = phot.get_residual_image() #resid = subtract_psf(resid, phot.psf_model, result['x_fit', 'y_fit', 'flux_fit'], subshape=phot.fitshape)
 
         # reset saturated pixels back to zero
         resid[satpix] = 0
