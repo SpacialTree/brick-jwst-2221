@@ -56,9 +56,9 @@ def print(*args, **kwargs):
 
 print("Done with imports", flush=True)
 
-basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
+#basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
 
-field = '002'
+#field = '002'
 
 class WrappedPSFModel(crowdsource.psf.SimplePSF):
     """
@@ -174,7 +174,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                     help="module list", metavar="modules")
     parser.add_option("-d", "--field", dest="field",
                     default='001',
-                    help="list of target fields", metavar="field")
+                    help="target field", metavar="field")
     parser.add_option("-d", "--desaturated", dest="desaturated",
                     default=False,
                     action='store_true',
@@ -199,7 +199,14 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
     filternames = options.filternames.split(",")
     modules = options.modules.split(",")
+    field = options.field.split(",")[0]
     use_desaturated = options.desaturated
+    
+    field_to_reg_mapping = {'001': 'brick', '002': 'cloudc'}
+    
+    regionname = field_to_reg_mapping[field]
+    
+    basepath = f'/orange/adamginsburg/jwst/{regionname}/'
 
     nullslice = (slice(None), slice(None))
 
