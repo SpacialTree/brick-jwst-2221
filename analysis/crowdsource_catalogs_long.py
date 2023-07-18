@@ -173,7 +173,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                     default='nrca,nrcb,merged,merged-reproject',
                     help="module list", metavar="modules")
     parser.add_option("-d", "--field", dest="field",
-                    default='001,002',
+                    default='001',
                     help="list of target fields", metavar="field")
     parser.add_option("-d", "--desaturated", dest="desaturated",
                     default=False,
