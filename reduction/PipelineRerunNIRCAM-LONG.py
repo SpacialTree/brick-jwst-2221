@@ -444,16 +444,17 @@ if __name__ == "__main__":
                                regionname=field_to_reg_mapping[field])
 
 
-    print("Running notebooks")
-    from run_notebook import run_notebook
-    basepath = '/orange/adamginsburg/jwst/brick/'
-    run_notebook(f'{basepath}/notebooks/BrA_Separation_nrca.ipynb')
-    run_notebook(f'{basepath}/notebooks/BrA_Separation_nrcb.ipynb')
-    run_notebook(f'{basepath}/notebooks/F466_separation_nrca.ipynb')
-    run_notebook(f'{basepath}/notebooks/F466_separation_nrcb.ipynb')
-    run_notebook(f'{basepath}/notebooks/StarDestroyer_nrca.ipynb')
-    run_notebook(f'{basepath}/notebooks/StarDestroyer_nrcb.ipynb')
-    run_notebook(f'{basepath}/notebooks/Stitch_A_to_B.ipynb')
+        print("Running notebooks")
+        from run_notebook import run_notebook
+        regionname = field_to_reg_mapping[field]
+        basepath = f'/orange/adamginsburg/jwst/{regionname}/' # Make sure notebooks are available at this basepath (ie. symbolic link)
+        run_notebook(f'{basepath}/notebooks/BrA_Separation_nrca.ipynb')
+        run_notebook(f'{basepath}/notebooks/BrA_Separation_nrcb.ipynb')
+        run_notebook(f'{basepath}/notebooks/F466_separation_nrca.ipynb')
+        run_notebook(f'{basepath}/notebooks/F466_separation_nrcb.ipynb')
+        run_notebook(f'{basepath}/notebooks/StarDestroyer_nrca.ipynb')
+        run_notebook(f'{basepath}/notebooks/StarDestroyer_nrcb.ipynb')
+        run_notebook(f'{basepath}/notebooks/Stitch_A_to_B.ipynb')
 
 
 """

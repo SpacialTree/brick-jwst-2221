@@ -15,15 +15,19 @@ from astropy import wcs
 from astropy import table
 from astropy import stats
 from astropy import units as u
+from astropy.nddata import NDData
 from astropy.io import fits
 import requests
 import requests.exceptions
 import urllib3
 import urllib3.exceptions
 from photutils.detection import DAOStarFinder, IRAFStarFinder
-from photutils.psf import DAOGroup, IntegratedGaussianPRF, extract_stars
+from photutils.psf import DAOGroup, IntegratedGaussianPRF, extract_stars, EPSFStars
 from photutils.psf import PSFPhotometry, IterativePSFPhotometry, SourceGrouper
-from photutils.background import MMMBackground, MADStdBackgroundRMS, MedianBackground, Background2D
+from photutils.background import MMMBackground, MADStdBackgroundRMS, MedianBackground, Background2D, LocalBackground
+
+from photutils.psf import EPSFBuilder
+from photutils.psf import extract_stars
 
 import warnings
 from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
@@ -168,6 +172,9 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
     parser.add_option("-m", "--modules", dest="modules",
                     default='nrca,nrcb,merged,merged-reproject',
                     help="module list", metavar="modules")
+    parser.add_option("-d", "--field", dest="field",
+                    default='001,002',
+                    help="list of target fields", metavar="field")
     parser.add_option("-d", "--desaturated", dest="desaturated",
                     default=False,
                     action='store_true',
@@ -184,6 +191,10 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                     default=False,
                     action='store_true',
                     help="perform background-subtraction first?", metavar="bgsub")
+    parser.add_option("--epsf", dest="epsf",
+                    default=False,
+                    action='store_true',
+                    help="try to make & use an ePSF?", metavar="epsf")
     (options, args) = parser.parse_args()
 
     filternames = options.filternames.split(",")
@@ -205,6 +216,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
             desat = '_unsatstar' if use_desaturated else ''
             bgsub = '_bgsub' if options.bgsub else ''
+            epsf_ = "epsf" if options.epsf else ""
 
             try:
                 pupil = 'clear'
@@ -581,10 +593,47 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                                     bbox_inches='tight')
 
 
-
             if options.daophot:
                 t0 = time.time()
                 print("Starting basic PSF photometry", flush=True)
+
+                if options.epsf:
+                    print("Building EPSF")
+                    epsf_builder = EPSFBuilder(oversampling=3, maxiters=10,
+                                               smoothing_kernel='quadratic',
+                                               progress_bar=True)
+
+                    epsfsel = ((finstars['peak'] > 200) &
+                               (finstars['roundness1'] > -0.25) &
+                               (finstars['roundness1'] < 0.25) &
+                               (finstars['roundness2'] > -0.25) &
+                               (finstars['roundness2'] < 0.25) &
+                               (finstars['sharpness'] > 0.4) &
+                               (finstars['sharpness'] < 0.8))
+
+                    print(f"Extracting {epsfsel.sum()} stars")
+                    stars = extract_stars(NDData(data=np.nan_to_num(data)), finstars[epsfsel], size=25)
+
+                    # reject stars with negative pixels
+                    #stars = EPSFStars([x for x in stars if x.data.min() >= 0])
+                    # apparently this failed - too restrictive?
+
+                    for star in stars:
+                        # background subtraction
+                        star.data[:] -= np.nanpercentile(star.data, 5)
+
+                    epsf, fitted_stars = epsf_builder(stars)
+
+                    # trim edges
+                    epsf._data = epsf.data[2:-2, 2:-2]
+
+                    norm = simple_norm(epsf.data, 'log', percent=99.0)
+                    pl.figure(1).clf()
+                    pl.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
+                    pl.colorbar()
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}_daophot_epsf.png',
+                               bbox_inches='tight')
+                    dao_psf_model = epsf
 
                 phot = PSFPhotometry(finder=daofind_tuned,#finder_maker(),
                                      #grouper=grouper,
@@ -603,41 +652,90 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                 print(f'len(result) = {len(result)}, len(coords) = {len(coords)}, type(result)={type(result)}', flush=True)
                 result['skycoord_centroid'] = coords
                 detector = "" # no detector #'s for long
-                result.write(f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{desat}{bgsub}_daophot_basic.fits", overwrite=True)
+                basic_daophot_catalog_fn = f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{desat}{bgsub}{epsf_}_daophot_basic.fits"
+                result.write(basic_daophot_catalog_fn, overwrite=True)
+                print(f"Completed BASIC photometry, and wrote out file {basic_daophot_catalog_fn}")
 
                 stars = result
                 stars['x'] = stars['x_fit']
                 stars['y'] = stars['y_fit']
-                modsky = phot.get_residual_image()
-                fits.PrimaryHDU(data=modsky, header=im1[1].header).writeto(
-                    filename.replace(".fits", "_daophot_residual.fits"),
+                print("Creating BASIC residual image, using 11x11 patches")
+                residual = phot.make_residual_image(data, (11, 11))
+                print("Done creating BASIC residual image, using 11x11 patches")
+                fits.PrimaryHDU(data=residual, header=im1[1].header).writeto(
+                    filename.replace(".fits", "_daophot_basic_residual.fits"),
                     overwrite=True)
+                print("Saved BASIC residual image, now making diagnostics.")
+                modsky = data - residual
                 try:
                     catalog_zoom_diagnostic(data, modsky, nullslice, stars)
-                    pl.suptitle(f"daophot basic Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daophot_basic.png',
+
+                    pl.suptitle(f"daophot basic Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}{epsf_}")
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}_catalog_diagnostics_daophot_basic.png',
                             bbox_inches='tight')
 
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                    pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daophot_basic.png',
+                    pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{desat}{bgsub}{epsf_}")
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}_catalog_diagnostics_zoom_daophot_basic.png',
                             bbox_inches='tight')
 
                     for name, zoomcut in zoomcut_list.items():
                         catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                        pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{desat}{bgsub} zoom {name}")
-                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}__catalog_diagnostics_zoom_daophot_basic{name.replace(" ","_")}.png',
+
+                        pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{desat}{bgsub}{epsf_} zoom {name}")
+                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}__catalog_diagnostics_zoom_daophot_basic{name.replace(" ","_")}.png',
                                 bbox_inches='tight')
                 except Exception as ex:
                     print(f'FAILURE: {ex}')
                 print(f"Done with diagnostics for BASIC photometry.  dt={time.time() - t0}")
+                pl.close('all')
 
             if options.daophot:
                 t0 = time.time()
+
+                print("Iterative PSF photometry")
+                if options.epsf:
+                    print("Building EPSF")
+                    epsf_builder = EPSFBuilder(oversampling=3, maxiters=10,
+                                               smoothing_kernel='quadratic',
+                                               progress_bar=True)
+
+                    epsfsel = ((finstars['peak'] > 200) &
+                               (finstars['roundness1'] > -0.25) &
+                               (finstars['roundness1'] < 0.25) &
+                               (finstars['roundness2'] > -0.25) &
+                               (finstars['roundness2'] < 0.25) &
+                               (finstars['sharpness'] > 0.4) &
+                               (finstars['sharpness'] < 0.8))
+
+                    print(f"Extracting {epsfsel.sum()} stars")
+                    stars = extract_stars(NDData(data=np.nan_to_num(data)), finstars[epsfsel], size=35)
+
+                    # reject stars with negative pixels
+                    #stars = EPSFStars([x for x in stars if x.data.min() >= 0])
+                    # apparently this failed - too restrictive?
+
+                    for star in stars:
+                        # background subtraction
+                        star.data[:] -= np.nanpercentile(star.data, 5)
+
+
+                    epsf, fitted_stars = epsf_builder(stars)
+
+                    # trim edges
+                    epsf._data = epsf.data[2:-2, 2:-2]
+
+                    norm = simple_norm(epsf.data, 'log', percent=99.0)
+                    pl.figure(1).clf()
+                    pl.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
+                    pl.colorbar()
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o001_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}_daophot_epsf.png',
+                               bbox_inches='tight')
+                    dao_psf_model = epsf
+
                 # iterative takes for-ev-er
                 phot_ = IterativePSFPhotometry(finder=daofind_tuned,
-                                               #grouper=grouper,
-                                               localbkg_estimator=mmm_bkg,
+                                               localbkg_estimator=LocalBackground(5, 15),
                                                psf_model=dao_psf_model,
                                                fitter=LevMarLSQFitter(),
                                                maxiters=2,
@@ -651,30 +749,40 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                 print(f"Done with ITERATIVE photometry. len(result2)={len(result2)}  dt={time.time() - t0}")
                 coords2 = ww.pixel_to_world(result2['x_fit'], result2['y_fit'])
                 result2['skycoord_centroid'] = coords2
-                print(f'len(result2) = {len(result2)}, len(coords) = {len(coords)}', flush=True)
+                print(f'len(result2) = {len(result2)}, len(coords) = {len(coords2)}', flush=True)
                 result2.write(f"{basepath}/{filtername}/{filtername.lower()}"
-                              f"_{module}{detector}{desat}{bgsub}"
+                              f"_{module}{detector}{desat}{bgsub}{epsf_}"
                               f"_daophot_iterative.fits", overwrite=True)
+                print("Saved iterative catalog")
                 stars = result2
                 stars['x'] = stars['x_fit']
                 stars['y'] = stars['y_fit']
 
-                modsky = phot_.get_residual_image()
+                print("Creating iterative residual")
+                residual = phot_.make_residual_image(data, (11, 11))
+                print("finished iterataive residual")
+                fits.PrimaryHDU(data=residual, header=im1[1].header).writeto(
+                    filename.replace(".fits", "_daophot_iterative_residual.fits"),
+                    overwrite=True)
+                print("Saved iterative residual")
+                modsky = data - residual
                 try:
                     catalog_zoom_diagnostic(data, modsky, nullslice, stars)
-                    pl.suptitle(f"daophot iterative Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_daophot_iterative.png',
+
+                    pl.suptitle(f"daophot iterative Catalog Diagnostics zoomed {filtername} {module}{desat}{bgsub}{epsf_}")
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}_catalog_diagnostics_daophot_iterative.png',
                             bbox_inches='tight')
 
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                    pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{desat}{bgsub}")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}_catalog_diagnostics_zoom_daophot_iterative.png',
+                    pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{desat}{bgsub}{epsf_}")
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}_catalog_diagnostics_zoom_daophot_iterative.png',
                             bbox_inches='tight')
 
                     for name, zoomcut in zoomcut_list.items():
                         catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                        pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{desat}{bgsub} zoom {name}")
-                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}__catalog_diagnostics_zoom_daophot_iterative{name.replace(" ","_")}.png',
+
+                        pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{desat}{bgsub}{epsf_} zoom {name}")
+                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{desat}{bgsub}{epsf_}__catalog_diagnostics_zoom_daophot_iterative{name.replace(" ","_")}.png',
                                 bbox_inches='tight')
                 except Exception as ex:
                     print(f'FAILURE: {ex}')

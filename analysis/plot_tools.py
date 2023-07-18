@@ -56,10 +56,10 @@ def crowdsource_diagnostic(basetable, exclude, filtername='f466n'):
 def plot_extvec_ccd(ax, color1, color2, ext=CT06_MWGC(), extvec_scale=200,
                     start=(0, 0),
                     color='y', head_width=0.5):
-    w1 = 4.10*u.um if color1[0] == '410m405' else 4.05*u.um if color1[0] == '405m410' else int(color1[0][1:-1])/100*u.um
-    w2 = 4.10*u.um if color1[1] == '410m405' else 4.05*u.um if color1[1] == '405m410' else int(color1[1][1:-1])/100*u.um
-    w3 = 4.10*u.um if color2[0] == '410m405' else 4.05*u.um if color2[0] == '405m410' else int(color2[0][1:-1])/100*u.um
-    w4 = 4.10*u.um if color2[1] == '410m405' else 4.05*u.um if color2[1] == '405m410' else int(color2[1][1:-1])/100*u.um
+    w1 = 4.10*u.um if color1[0] == '410m405' else 4.05*u.um if color1[0] == '405m410' else 1.634*u.um if color1[0] == 'Hmag' else 2.143527*u.um if color1[0] == 'Ksmag' else int(color1[0][1:-1])/100*u.um
+    w2 = 4.10*u.um if color1[1] == '410m405' else 4.05*u.um if color1[1] == '405m410' else 1.634*u.um if color1[1] == 'Hmag' else 2.143527*u.um if color1[1] == 'Ksmag' else int(color1[1][1:-1])/100*u.um
+    w3 = 4.10*u.um if color2[0] == '410m405' else 4.05*u.um if color2[0] == '405m410' else 1.634*u.um if color2[0] == 'Hmag' else 2.143527*u.um if color2[0] == 'Ksmag' else int(color2[0][1:-1])/100*u.um
+    w4 = 4.10*u.um if color2[1] == '410m405' else 4.05*u.um if color2[1] == '405m410' else 1.634*u.um if color2[1] == 'Hmag' else 2.143527*u.um if color2[1] == 'Ksmag' else int(color2[1][1:-1])/100*u.um
 
     if w1 > w2:
         w1,w2 = w2,w1
@@ -471,9 +471,10 @@ def xmatch_plot(basetable, ref_filter='f410m', filternames=filternames,
         #ax2.set_xlabel("Separation (\")")
         ax2.set_title(filtername)
 
+        print(f"sep: {sep}, std(sep): {np.std(sep)}")
         statsd[filtername] = {
             'med': np.median(sep),
-            'mad': stats.mad_std(sep),
+            'mad': stats.mad_std(sep.copy()),
             'std': np.std(sep),
             'med_thr': np.median(sep[ok]),
             'mad_thr': stats.mad_std(sep[ok]),
