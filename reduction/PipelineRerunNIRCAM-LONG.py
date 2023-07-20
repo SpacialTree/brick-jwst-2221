@@ -42,6 +42,14 @@ import crds
 import datetime
 import jwst
 
+import warnings
+from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
+from astropy.wcs import FITSFixedWarning
+warnings.simplefilter('ignore', category=AstropyWarning)
+warnings.simplefilter('ignore', category=AstropyDeprecationWarning)
+warnings.simplefilter('ignore', category=FITSFixedWarning)
+
+
 def print(*args, **kwargs):
     now = datetime.datetime.now().isoformat()
     from builtins import print as printfunc
