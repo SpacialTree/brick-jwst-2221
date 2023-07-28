@@ -327,6 +327,10 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         # try merging all frames & modules
         log.info("Working on merged reduction (both modules)")
 
+	fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
+                       'cloudc': 'regions/nircam_cloudc_fov.reg',
+                      }
+
         # Load asn_data for both modules
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
@@ -352,9 +356,6 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
             json.dump(asn_data, fh)
 
 
-        fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
-                       'cloudc': 'regions/nircam_cloudc_fov.reg',
-                      }
         if filtername.lower() == 'f405n':
             vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-{module}_vvvcat.ecsv')
             print(f"Loaded VVV catalog {vvvdr2fn}")
