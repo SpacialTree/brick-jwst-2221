@@ -111,7 +111,8 @@ def realign_to_vvv(
     fieldnumber='001',
     ksmag_limit=15,
     mag_limit=15,
-):
+    raoffset=0*u.arcsec, decoffset=0*u.arcsec,
+    ):
     """
     ksmag_limit is a *lower* limit (we want fainter sources from VVV), while mag_limit is an *upper limit* - we want brighter sources from JWST
     """
@@ -127,7 +128,8 @@ def realign_to_vvv(
                               module=module, basepath=basepath,
                               fieldnumber=fieldnumber,
                               catfile=catfile, imfile=imfile,
-                              mag_limit=15,
+                              mag_limit=15, 
+                              raoffset=raoffset, decoffset=decoffset,
                               )
 
 
@@ -137,7 +139,8 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
                        fieldnumber='001',
                        max_offset=0.4*u.arcsec,
                        mag_limit=15,
-                       catfile=None, imfile=None):
+                       catfile=None, imfile=None,
+                       raoffset=0*u.arcsec, decoffset=0*u.arcsec):
     if catfile is None:
         catfile = f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{fieldnumber}_t001_nircam_clear-{filtername}-{module}_cat.ecsv'
     if imfile is None:
@@ -164,6 +167,7 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         ww =  WCS(fits.getheader(imfile, ext=('SCI', 1)))
+        ww.wcs.crval = ww.wcs.crval - [raoffset.to(u.deg).value, decoffset.to(u.deg).value]
     skycrds_cat = ww.pixel_to_world(cat['xcentroid'], cat['ycentroid'])
 
     idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat[sel], max_offset)

@@ -223,7 +223,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
             realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
             shutil.copy(member['expname'], realigned_vvv_member)
             realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
-                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15)
+                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, decoffset=-8*u.arcsec)
             
             member['expname'] = realigned_vvv_member
 
@@ -346,7 +346,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
             realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
             shutil.copy(member['expname'], realigned_vvv_member)
             realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
-                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15)
+                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, decoffset=-8*u.arcsec)
             
             member['expname'] = realigned_vvv_member
 
