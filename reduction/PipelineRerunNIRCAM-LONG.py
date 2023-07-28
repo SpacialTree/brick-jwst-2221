@@ -12,6 +12,7 @@ from astropy.io import ascii, fits
 from astropy.utils.data import download_file
 from astropy.visualization import ImageNormalize, ManualInterval, LogStretch, LinearStretch
 from astropy.table import Table
+import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
