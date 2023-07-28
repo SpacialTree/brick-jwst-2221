@@ -327,7 +327,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         # try merging all frames & modules
         log.info("Working on merged reduction (both modules)")
 
-	fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
+        fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
                        'cloudc': 'regions/nircam_cloudc_fov.reg',
                       }
 
