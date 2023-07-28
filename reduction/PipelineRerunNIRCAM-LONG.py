@@ -164,7 +164,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
         else:
             raise ValueError(f"Mismatch: Did not find any asn files for module {module} for field {field} in {output_dir}")
 
-        mapping = crds.rmap.load_mapping('/orange/adamginsburg/jwst/brick/crds/mappings/jwst/jwst_nircam_pars-tweakregstep_0003.rmap')
+        mapping = crds.rmap.load_mapping(f'/orange/adamginsburg/jwst/{regionname}/crds/mappings/jwst/jwst_nircam_pars-tweakregstep_0003.rmap')
         print(f"Mapping: {mapping.todict()['selections']}")
         print(f"Filtername: {filtername}")
         filter_match = [x for x in mapping.todict()['selections'] if filtername in x]
@@ -201,6 +201,10 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
 
     if module in ('nrca', 'nrcb'):
         print(f"Filter {filtername} module {module}")
+        
+        fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
+                      'cloudc': 'regions/nircam_cloudc_fov.reg',
+                      }
 
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
@@ -215,16 +219,18 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    use_background_map=True,
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
+            
+            realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
+            shutil.copy(member['expname'], realigned_vvv_member)
+            realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
+                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15)
+            
+            member['expname'] = realigned_vvv_member
 
         asn_file_each = asn_file.replace("_asn.json", f"_{module}_asn.json")
         with open(asn_file_each, 'w') as fh:
             json.dump(asn_data, fh)
-
-
-        fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
-                      'cloudc': 'regions/nircam_cloudc_fov.reg',
-                      }
-
+        
         if filtername.lower() == 'f405n':
         # for the VVV cat, use the merged version: no need for independent versions
             abs_refcat = vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw02221-o{field}_t001_nircam_clear-{filtername}-merged_vvvcat.ecsv') # file needed by crowdsource_catalogs_long
@@ -267,6 +273,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
                                     # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
+                                    'skip': True,
                                     })
 
         log.info(f"Running tweakreg ({module})")
@@ -331,6 +338,13 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    use_background_map=True,
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
+            
+            realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
+            shutil.copy(member['expname'], realigned_vvv_member)
+            realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
+                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15)
+            
+            member['expname'] = realigned_vvv_member
 
         asn_data['products'][0]['name'] = f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-merged'
         asn_file_merged = asn_file.replace("_asn.json", f"_merged_asn.json")
@@ -377,6 +391,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
+                                    'skip': True,
                                     })
 
         log.info("Running tweakreg (merged)")
