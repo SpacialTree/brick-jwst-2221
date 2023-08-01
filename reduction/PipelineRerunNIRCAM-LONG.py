@@ -220,13 +220,23 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    use_background_map=True,
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
-            
-            realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
-            shutil.copy(member['expname'], realigned_vvv_member)
-            realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
-                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, decoffset=-8*u.arcsec)
-            
-            member['expname'] = realigned_vvv_member
+
+            if field == '002':
+                realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
+                shutil.copy(member['expname'], realigned_vvv_member)
+                visit = member['expname'].split('_')[0][-3:]
+                if visit == '001':
+                    raoffset = 0*u.arcsec
+                    decoffset = -8*u.arcsec
+                elif visit == '002':
+                    raoffset = -1*u.arcsec
+                    decoffset = -4*u.arcsec
+                else:
+                    raoffset = 0*u.arcsec
+                    decoffset = 0*u.arcsec
+                realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
+                               imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, raoffset=raoffset, decoffset=decoffset)
+                member['expname'] = realigned_vvv_member
 
         asn_file_each = asn_file.replace("_asn.json", f"_{module}_asn.json")
         with open(asn_file_each, 'w') as fh:
@@ -274,7 +284,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
                                     # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
-                                    'skip': True,
+                                    #'skip': True,
                                     })
 
         log.info(f"Running tweakreg ({module})")
@@ -344,12 +354,22 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
             
-            realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
-            shutil.copy(member['expname'], realigned_vvv_member)
-            realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
-                           imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, decoffset=-8*u.arcsec)
-            
-            member['expname'] = realigned_vvv_member
+            if field == '002':
+                realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
+                shutil.copy(member['expname'], realigned_vvv_member)
+                visit = member['expname'].split('_')[0][-3:]
+                if visit == '001':
+                    raoffset = 0*u.arcsec
+                    decoffset = -8*u.arcsec
+                elif visit == '002':
+                    raoffset = -1*u.arcsec
+                    decoffset = -4*u.arcsec
+                else:
+                    raoffset = 0*u.arcsec
+                    decoffset = 0*u.arcsec
+                realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
+                               imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, raoffset=raoffset, decoffset=decoffset)
+                member['expname'] = realigned_vvv_member
 
         asn_data['products'][0]['name'] = f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-merged'
         asn_file_merged = asn_file.replace("_asn.json", f"_merged_asn.json")
@@ -393,7 +413,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
-                                    'skip': True,
+                                    #'skip': True,
                                     })
 
         log.info("Running tweakreg (merged)")
