@@ -167,7 +167,7 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         ww =  WCS(fits.getheader(imfile, ext=('SCI', 1)))
-        ww.wcs.crval = ww.wcs.crval - [raoffset.to(u.deg).value, decoffset.to(u.deg).value]
+        ww.wcs.crval = ww.wcs.crval - [raoffset.to(u.deg).value, decoffset.to(u.deg).value] # visualize this adjustment separately from next, find out which step is wrong
     skycrds_cat = ww.pixel_to_world(cat['xcentroid'], cat['ycentroid'])
 
     idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat[sel], max_offset)
@@ -184,7 +184,7 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
         print(cat, sel, idx, sidx, sep)
         raise ValueError(f"median(dra) = {np.median(dra)}.  np.nanmedian(dra) = {np.nanmedian(dra)}")
 
-    ww.wcs.crval = ww.wcs.crval - [np.median(dra).to(u.deg).value, np.median(ddec).to(u.deg).value]
+    ww.wcs.crval = ww.wcs.crval - [np.median(dra).to(u.deg).value, np.median(ddec).to(u.deg).value] # next
 
     with fits.open(imfile, mode='update') as hdulist:
         print("CRVAL before", hdulist['SCI'].header['CRVAL1'], hdulist['SCI'].header['CRVAL2'])
