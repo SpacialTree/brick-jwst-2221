@@ -222,7 +222,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                 member['expname'] = outname
 
             if field == '002': # make dictionary with every exposure, for every field put in ra and dec offset, default to bottom numbers, include more accurate 
-                realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
+                realigned_vvv_member = member['expname'].split('.')[0]+'_align.fits'
                 shutil.copy(member['expname'], realigned_vvv_member)
                 visit = member['expname'].split('_')[0][-3:]
                 if visit == '001':
