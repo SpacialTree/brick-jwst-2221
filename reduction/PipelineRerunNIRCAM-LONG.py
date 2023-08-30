@@ -221,7 +221,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
 
-            if field == '002' and filtername.lower() == 'f405n': 
+            if field == '002' and (filtername.lower() == 'f405n' or filtername.lower() == 'f410m' or filtername.lower() == 'f466n'):
                 align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
                 shutil.copy(member['expname'], align_image)
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
@@ -349,7 +349,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
             
-            if field == '002' and filtername.lower() == 'f405n': 
+            if field == '002' and (filtername.lower() == 'f405n' or filtername.lower() == 'f410m' or filtername.lower() == 'f466n'): 
                 align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
                 shutil.copy(member['expname'], align_image)
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
@@ -403,7 +403,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
-                                    'skip': True,
+                                    #'skip': True,
                                     })
 
         log.info("Running tweakreg (merged)")
