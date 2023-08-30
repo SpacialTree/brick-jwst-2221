@@ -16,7 +16,7 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 
-# do this before importing webb
+# do this before importing webb==
 os.environ["CRDS_PATH"] = "/orange/adamginsburg/jwst/brick/crds/"
 os.environ["CRDS_SERVER_URL"] = "https://jwst-crds.stsci.edu"
 
@@ -349,22 +349,17 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
             
-            if field == '002':
-                realigned_vvv_member = member['expname'].split('.')[0]+'_realigned_to_vvv.fits'
-                shutil.copy(member['expname'], realigned_vvv_member)
-                visit = member['expname'].split('_')[0][-3:]
-                if visit == '001':
-                    raoffset = 0*u.arcsec
-                    decoffset = -8*u.arcsec
-                elif visit == '002':
-                    raoffset = -1*u.arcsec
-                    decoffset = -4*u.arcsec
-                else:
-                    raoffset = 0*u.arcsec
-                    decoffset = 0*u.arcsec
-                realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
-                               imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, raoffset=raoffset, decoffset=decoffset)
-                member['expname'] = realigned_vvv_member
+            if field == '002' and filtername.lower() == 'f405n': 
+                align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
+                shutil.copy(member['expname'], align_image)
+                offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
+                row = offsets_tbl[member['expname'] in offsets_tbl['Filename_1']]
+                align_fits = fits.open(align_image)
+                pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
+                align_fits['SCI',1].header['CRPIX1']+=(row['xshift (arcsec)']*u.arcsec/pixel_scale).value
+                align_fits['SCI',1].header['CRPIX2']+=(row['yshift (arcsec)']*u.arcsec/pixel_scale).value
+                align_fits.writeto(align_image, overwrite=True)
+                member['expname'] = align_image
 
         asn_data['products'][0]['name'] = f'jw02221-o{field}_t001_nircam_clear-{filtername.lower()}-merged'
         asn_file_merged = asn_file.replace("_asn.json", f"_merged_asn.json")
