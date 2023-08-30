@@ -221,22 +221,17 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
 
-            if field == '002': # make dictionary with every exposure, for every field put in ra and dec offset, default to bottom numbers, include more accurate 
-                realigned_vvv_member = member['expname'].split('.')[0]+'_align.fits'
-                shutil.copy(member['expname'], realigned_vvv_member)
-                visit = member['expname'].split('_')[0][-3:]
-                if visit == '001':
-                    raoffset = 0*u.arcsec
-                    decoffset = -8*u.arcsec
-                elif visit == '002':
-                    raoffset = -1*u.arcsec
-                    decoffset = -4*u.arcsec
-                else:
-                    raoffset = 0*u.arcsec
-                    decoffset = 0*u.arcsec
-                realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field, 
-                               imfile=realigned_vvv_member, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15, raoffset=raoffset, decoffset=decoffset)
-                member['expname'] = realigned_vvv_member
+            if field == '002' and filtername.lower() == 'f405n': 
+                align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
+                shutil.copy(member['expname'], align_image)
+                offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
+                row = offsets_tbl[member['expname'] in offsets_tbl['Filename_1']]
+                align_fits = fits.open(align_image)
+                pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
+                align_fits['SCI',1].header['CRPIX1']+=(row['xshift (arcsec)']*u.arcsec/pixel_scale).value
+                align_fits['SCI',1].header['CRPIX2']+=(row['yshift (arcsec)']*u.arcsec/pixel_scale).value
+                align_fits.writeto(align_image, overwrite=True)
+                member['expname'] = align_image
 
         asn_file_each = asn_file.replace("_asn.json", f"_{module}_asn.json")
         with open(asn_file_each, 'w') as fh:
@@ -284,7 +279,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
                                     # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
-                                    'skip': True,
+                                    #'skip': True,
                                     })
 
         log.info(f"Running tweakreg ({module})")
