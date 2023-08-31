@@ -228,8 +228,26 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 align_fits = fits.open(align_image)
                 pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
-                align_fits['SCI',1].header['CRPIX1']+=(row['xshift (arcsec)']*u.arcsec/pixel_scale).value
-                align_fits['SCI',1].header['CRPIX2']+=(row['yshift (arcsec)']*u.arcsec/pixel_scale).value
+                try: 
+                    print('Running manual align.')
+                    print(align_fits['SCI',1].header['CRPIX1'], (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    print(align_fits['SCI',1].header['CRPIX1'] + (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    print(align_fits['SCI',1].header['CRPIX2'], (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    print(align_fits['SCI',1].header['CRPIX2'] + (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    align_fits['SCI',1].header['CRPIX1']+=(float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value
+                    align_fits['SCI',1].header['CRPIX2']+=(float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value
+                except: 
+                    print('Something went wrong with manual align, running default values.')
+                    visit = member['expname'].split('_')[0][-3:]
+                    if visit == '001':
+                        align_fits['SCI',1].header['CRPIX1']+=(8*u.arcsec/pixel_scale).value
+                        align_fits['SCI',1].header['CRPIX2']+=(-0.3*u.arcsec/pixel_scale).value
+                    elif visit == '002':
+                        align_fits['SCI',1].header['CRPIX1']+=(3.9*u.arcsec/pixel_scale).value
+                        align_fits['SCI',1].header['CRPIX2']+=(1*u.arcsec/pixel_scale).value
+                    else:
+                        align_fits['SCI',1].header['CRPIX1']+=(0*u.arcsec/pixel_scale).value
+                        align_fits['SCI',1].header['CRPIX2']+=(0*u.arcsec/pixel_scale).value
                 align_fits.writeto(align_image, overwrite=True)
                 member['expname'] = align_image
 
@@ -349,15 +367,33 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                    median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                 member['expname'] = outname
             
-            if field == '002' and (filtername.lower() == 'f405n' or filtername.lower() == 'f410m' or filtername.lower() == 'f466n'): 
+            if field == '002' and (filtername.lower() == 'f405n' or filtername.lower() == 'f410m' or filtername.lower() == 'f466n'):
                 align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
                 shutil.copy(member['expname'], align_image)
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 align_fits = fits.open(align_image)
                 pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
-                align_fits['SCI',1].header['CRPIX1']+=(row['xshift (arcsec)']*u.arcsec/pixel_scale).value
-                align_fits['SCI',1].header['CRPIX2']+=(row['yshift (arcsec)']*u.arcsec/pixel_scale).value
+                try: 
+                    print('Running manual align.')
+                    print(align_fits['SCI',1].header['CRPIX1'], (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    print(align_fits['SCI',1].header['CRPIX1'] + (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    print(align_fits['SCI',1].header['CRPIX2'], (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    print(align_fits['SCI',1].header['CRPIX2'] + (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
+                    align_fits['SCI',1].header['CRPIX1']+=(float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value
+                    align_fits['SCI',1].header['CRPIX2']+=(float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value
+                except: 
+                    print('Something went wrong with manual align, running default values.')
+                    visit = member['expname'].split('_')[0][-3:]
+                    if visit == '001':
+                        align_fits['SCI',1].header['CRPIX1']+=(8*u.arcsec/pixel_scale).value
+                        align_fits['SCI',1].header['CRPIX2']+=(-0.3*u.arcsec/pixel_scale).value
+                    elif visit == '002':
+                        align_fits['SCI',1].header['CRPIX1']+=(3.9*u.arcsec/pixel_scale).value
+                        align_fits['SCI',1].header['CRPIX2']+=(1*u.arcsec/pixel_scale).value
+                    else:
+                        align_fits['SCI',1].header['CRPIX1']+=(0*u.arcsec/pixel_scale).value
+                        align_fits['SCI',1].header['CRPIX2']+=(0*u.arcsec/pixel_scale).value
                 align_fits.writeto(align_image, overwrite=True)
                 member['expname'] = align_image
 
