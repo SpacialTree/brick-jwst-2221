@@ -225,7 +225,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                 align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
                 shutil.copy(member['expname'], align_image)
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
-                row = offsets_tbl[member['expname']split('/')[-1] == offsets_tbl['Filename_1']]
+                row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 align_fits = fits.open(align_image)
                 pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
                 align_fits['SCI',1].header['CRPIX1']+=(row['xshift (arcsec)']*u.arcsec/pixel_scale).value
@@ -353,7 +353,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                 align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
                 shutil.copy(member['expname'], align_image)
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
-                row = offsets_tbl[member['expname']split('/')[-1] == offsets_tbl['Filename_1']]
+                row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 align_fits = fits.open(align_image)
                 pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
                 align_fits['SCI',1].header['CRPIX1']+=(row['xshift (arcsec)']*u.arcsec/pixel_scale).value
