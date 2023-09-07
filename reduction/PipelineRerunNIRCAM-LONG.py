@@ -297,7 +297,8 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
                                     # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
-                                    #'skip': True,
+                                    'tweakreg.save_results': True,
+                                    'skip': True,
                                     })
 
         log.info(f"Running tweakreg ({module})")
@@ -439,7 +440,8 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
-                                    #'skip': True,
+                                    'tweakreg.save_results': True,
+                                    'skip': True,
                                     })
 
         log.info("Running tweakreg (merged)")
