@@ -1,0 +1,58 @@
+from spectral_cube import SpectralCube
+import numpy as np
+from astropy.visualization import quantity_support
+from astropy import units as u
+from astropy import wcs
+import matplotlib.pyplot as plt
+from astropy.utils import data
+from reproject import reproject_exact
+from astropy.io import fits
+import regions
+import glob, os
+import spectral_cube
+
+# Filename for large cube
+filename_full = '/orange/adamginsburg/ACES/mosaics/cubes/HNCO_7m12mTP_CubeMosaic.fits'
+line = "HNCO" ## CHANGE THIS FOR OTHER LINES
+
+# All of the Cloud C cutouts
+files = glob.glob('/orange/adamginsburg/jwst/cloudc/alma/cutouts/cloudc_*')
+
+# Read the region files
+reg = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/nircam_cloudc_fov_perp.reg')
+reg_cloud = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/large_cloud.reg')
+reg_sub = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/sub_cloud.reg')
+reg_hmsfr = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/hmsfr.reg')
+reg_filament = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/filament.reg')
+reg_double = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/double_peak.reg')
+
+reg_fov = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/fov.reg')
+
+### Cubes
+cube_full = SpectralCube.read(filename_full).with_spectral_unit(u.km/u.s, velocity_convention='radio')
+
+cube_full_reg = cube_full.subcube_from_regions(reg, minimize=False)
+cube_full_cloud = cube_full.subcube_from_regions(reg_cloud, minimize=False).spectral_slab(8*u.km/u.s, 37*u.km/u.s)
+cube_full_sub = cube_full.subcube_from_regions(reg_sub, minimize=False).spectral_slab(-27*u.km/u.s, 23*u.km/u.s)
+cube_full_hmsfr = cube_full.subcube_from_regions(reg_hmsfr, minimize=False).spectral_slab(25*u.km/u.s, 50*u.km/u.s)
+cube_full_filament = cube_full.subcube_from_regions(reg_filament, minimize=False).spectral_slab(-59*u.km/u.s, -52*u.km/u.s)
+cube_full_double = cube_full.subcube_from_regions(reg_double, minimize=False).spectral_slab(0*u.km/u.s, 45*u.km/u.s)
+
+### Moment Maps - put these in order of least and most likely to crash
+mom0_full_double = cube_full_double.moment0()
+mom0_full_double.write(f'/orange/adamginsburg/jwst/cloudc/alma/moments/mom0_downsampled_{line}_double.fits')
+
+mom0_full_sub = cube_full_sub.moment0()
+mom0_full_sub.write(f'/orange/adamginsburg/jwst/cloudc/alma/moments/mom0_downsampled_{line}_sub.fits')
+
+mom0_full_filament = cube_full_filament.moment0()
+mom0_full_filament.write(f'/orange/adamginsburg/jwst/cloudc/alma/moments/mom0_downsampled_{line}_filament.fits')
+
+mom0_full_hmsfr = cube_full_hmsfr.moment0()
+mom0_full_hmsfr.write(f'/orange/adamginsburg/jwst/cloudc/alma/moments/mom0_downsampled_{line}_hmsfr.fits')
+
+mom0_full_cloud = cube_full_cloud.moment0()
+mom0_full_cloud.write(f'/orange/adamginsburg/jwst/cloudc/alma/moments/mom0_downsampled_{line}_cloud.fits')
+
+mom0_full_reg = cube_full_reg.moment0()
+mom0_full_reg.write(f'/orange/adamginsburg/jwst/cloudc/alma/moments/mom0_downsampled_{line}_reg.fits')
