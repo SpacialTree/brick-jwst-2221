@@ -26,6 +26,7 @@ from jwst.pipeline import Detector1Pipeline, Image2Pipeline
 # Individual steps that make up calwebb_image3
 from jwst.tweakreg import TweakRegStep
 from jwst.skymatch import SkyMatchStep
+from jwst.tweakreg.utils import adjust_wcs
 from jwst.outlier_detection import OutlierDetectionStep
 from jwst.resample import ResampleStep
 from jwst.source_catalog import SourceCatalogStep
@@ -230,24 +231,26 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                 pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
                 try: 
                     print('Running manual align.')
-                    print(align_fits['SCI',1].header['CRPIX1'], (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    print(align_fits['SCI',1].header['CRPIX1'] + (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    print(align_fits['SCI',1].header['CRPIX2'], (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    print(align_fits['SCI',1].header['CRPIX2'] + (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    align_fits['SCI',1].header['CRPIX1']+=(float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value
-                    align_fits['SCI',1].header['CRPIX2']+=(float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value
+                    xshift = float(row['xshift (arcsec)'])*u.arcsec
+                    yshift = float(row['yshift (arcsec)'])*u.arcsec
                 except: 
                     print('Something went wrong with manual align, running default values.')
                     visit = member['expname'].split('_')[0][-3:]
                     if visit == '001':
-                        align_fits['SCI',1].header['CRPIX1']+=(8*u.arcsec/pixel_scale).value
-                        align_fits['SCI',1].header['CRPIX2']+=(-0.3*u.arcsec/pixel_scale).value
+                        xshift = 8*u.arcsec
+                        yshift = -0.3*u.arcsec
                     elif visit == '002':
-                        align_fits['SCI',1].header['CRPIX1']+=(3.9*u.arcsec/pixel_scale).value
-                        align_fits['SCI',1].header['CRPIX2']+=(1*u.arcsec/pixel_scale).value
+                        xshift = 3.9*u.arcsec/pixel_scale
+                        yshift = 1*u.arcsec/pixel_scale
                     else:
-                        align_fits['SCI',1].header['CRPIX1']+=(0*u.arcsec/pixel_scale).value
-                        align_fits['SCI',1].header['CRPIX2']+=(0*u.arcsec/pixel_scale).value
+                        xshift = 0*u.arcsec/pixel_scale
+                        yshift = 0*u.arcsec/pixel_scale
+                fa = asdf.open(align_image)
+                wcsobj = fa.tree['meta']['wcs']
+                ww = adjust_wcs(wcsobj, delta_ra=yshift, delta_dec=xshift)
+                tree = fa.tree
+                tree['meta']['wcs'] = ww
+                fa = asdf.fits_embed.AsdfInFits(align_fits, tree)                    
                 align_fits.writeto(align_image, overwrite=True)
                 member['expname'] = align_image
 
@@ -297,8 +300,8 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
                                     # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
-                                    'tweakreg.save_results': True,
-                                    'skip': True,
+                                    'searchrad': 5,
+                                    'skip': False,
                                     })
 
         log.info(f"Running tweakreg ({module})")
@@ -377,24 +380,26 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                 pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
                 try: 
                     print('Running manual align.')
-                    print(align_fits['SCI',1].header['CRPIX1'], (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    print(align_fits['SCI',1].header['CRPIX1'] + (float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    print(align_fits['SCI',1].header['CRPIX2'], (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    print(align_fits['SCI',1].header['CRPIX2'] + (float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value)
-                    align_fits['SCI',1].header['CRPIX1']+=(float(row['xshift (arcsec)'])*u.arcsec/pixel_scale).value
-                    align_fits['SCI',1].header['CRPIX2']+=(float(row['yshift (arcsec)'])*u.arcsec/pixel_scale).value
+                    xshift = float(row['xshift (arcsec)'])*u.arcsec
+                    yshift = float(row['yshift (arcsec)'])*u.arcsec
                 except: 
                     print('Something went wrong with manual align, running default values.')
                     visit = member['expname'].split('_')[0][-3:]
                     if visit == '001':
-                        align_fits['SCI',1].header['CRPIX1']+=(8*u.arcsec/pixel_scale).value
-                        align_fits['SCI',1].header['CRPIX2']+=(-0.3*u.arcsec/pixel_scale).value
+                        xshift = 8*u.arcsec
+                        yshift = -0.3*u.arcsec
                     elif visit == '002':
-                        align_fits['SCI',1].header['CRPIX1']+=(3.9*u.arcsec/pixel_scale).value
-                        align_fits['SCI',1].header['CRPIX2']+=(1*u.arcsec/pixel_scale).value
+                        xshift = 3.9*u.arcsec/pixel_scale
+                        yshift = 1*u.arcsec/pixel_scale
                     else:
-                        align_fits['SCI',1].header['CRPIX1']+=(0*u.arcsec/pixel_scale).value
-                        align_fits['SCI',1].header['CRPIX2']+=(0*u.arcsec/pixel_scale).value
+                        xshift = 0*u.arcsec/pixel_scale
+                        yshift = 0*u.arcsec/pixel_scale
+                fa = asdf.open(align_image)
+                wcsobj = fa.tree['meta']['wcs']
+                ww = adjust_wcs(wcsobj, delta_ra=yshift, delta_dec=xshift)
+                tree = fa.tree
+                tree['meta']['wcs'] = ww
+                fa = asdf.fits_embed.AsdfInFits(align_fits, tree)                    
                 align_fits.writeto(align_image, overwrite=True)
                 member['expname'] = align_image
 
@@ -440,8 +445,8 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
-                                    'tweakreg.save_results': True,
-                                    'skip': True,
+                                    'searchrad': 5,
+                                    'skip': False,
                                     })
 
         log.info("Running tweakreg (merged)")
