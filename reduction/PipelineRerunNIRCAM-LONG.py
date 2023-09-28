@@ -247,7 +247,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                         yshift = 0*u.arcsec/pixel_scale
                 fa = asdf.open(align_image)
                 wcsobj = fa.tree['meta']['wcs']
-                ww = adjust_wcs(wcsobj, delta_ra=yshift, delta_dec=xshift)
+                ww = adjust_wcs(wcsobj, delta_ra=-yshift, delta_dec=-xshift)
                 tree = fa.tree
                 tree['meta']['wcs'] = ww
                 fa = asdf.fits_embed.AsdfInFits(align_fits, tree)                    
@@ -301,6 +301,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'separation': 0.5, # minimum separation; default is 1
                                     # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
                                     'searchrad': 5,
+                                    'save_results': True,
                                     'skip': False,
                                     })
 
@@ -396,7 +397,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                         yshift = 0*u.arcsec/pixel_scale
                 fa = asdf.open(align_image)
                 wcsobj = fa.tree['meta']['wcs']
-                ww = adjust_wcs(wcsobj, delta_ra=yshift, delta_dec=xshift)
+                ww = adjust_wcs(wcsobj, delta_ra=-yshift, delta_dec=-xshift)
                 tree = fa.tree
                 tree['meta']['wcs'] = ww
                 fa = asdf.fits_embed.AsdfInFits(align_fits, tree)                    
@@ -446,6 +447,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001')
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
                                     'searchrad': 5,
+                                    'save_results': True,
                                     'skip': False,
                                     })
 
