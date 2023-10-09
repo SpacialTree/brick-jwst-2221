@@ -62,7 +62,7 @@ def retrieve_vvv(
     module = 'nrca',
     imfile = None,
     catfile = None,
-    fov_regname='regions/nircam_brick_fov.reg',
+    fov_regname='regions_/nircam_brick_fov.reg',
     fieldnumber='001',
 ):
     fov = regions.Regions.read(os.path.join(basepath, fov_regname))
@@ -107,7 +107,7 @@ def realign_to_vvv(
     module = 'nrca',
     imfile = None,
     catfile = None,
-    fov_regname='regions/nircam_brick_fov.reg',
+    fov_regname='regions_/nircam_brick_fov.reg',
     fieldnumber='001',
     ksmag_limit=15,
     mag_limit=15,
@@ -149,7 +149,6 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
     cat = Table.read(catfile)
 
     # HACKETY HACK HACK filtering by flux
-    #flux = (cat['aper30_abmag'].value * u.ABmag).to(u.Jy)
     # 7e-8 is the empirical MJy/sr in one pixel-to-ABmag-flux conversion
     # it seems to hold for all of the fields, kinda?
     #sel = (flux > 7e-8*500*u.Jy) & (flux < 4000*7e-8*u.Jy)

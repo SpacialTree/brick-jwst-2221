@@ -50,8 +50,8 @@ distance_modulus = dm = 5*np.log10(8.3*u.kpc / (10*u.pc))
 
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 
-reg = regions.Regions.read(f'{basepath}/regions/leftside_brick_zoom.reg')[0]
-regzoom = regions.Regions.read(f'{basepath}/regions/leftside_brick_rezoom.reg')[0]
+reg = regions.Regions.read(f'{basepath}/regions_/leftside_brick_zoom.reg')[0]
+regzoom = regions.Regions.read(f'{basepath}/regions_/leftside_brick_rezoom.reg')[0]
 
 
 fh_nrca = fits.open(f'{basepath}/F410M/pipeline/jw02221-o001_t001_nircam_clear-f410m-nrca_i2d.fits')
@@ -97,6 +97,8 @@ basetable_merged = basetable = Table.read(f'{basepath}/catalogs/crowdsource_nsky
 basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged_20230702.fits')
 # updated version: has metadata about which filter was used as the reference
 basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged_20230827.fits')
+# updated version: new magnitude calcs
+basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged_20231003.fits')
 
 basetable_nrca = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_nrca_photometry_tables_merged.fits')
 basetable_nrcb = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_nrcb_photometry_tables_merged.fits')
