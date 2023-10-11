@@ -428,6 +428,10 @@ def main(filtername, module, Observations=None, regionname='brick', field='001',
                 fa = asdf.fits_embed.AsdfInFits(align_fits, tree)                    
                 align_fits.writeto(align_image, overwrite=True)
                 member['expname'] = align_image
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7ba124c721a0aee589b3a91b5334407c65ac044d
 
         asn_data['products'][0]['name'] = f'jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-merged'
         asn_file_merged = asn_file.replace("_asn.json", f"_merged_asn.json")
