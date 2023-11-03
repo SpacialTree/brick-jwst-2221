@@ -225,14 +225,24 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             bgsub = '_bgsub' if options.bgsub else ''
             epsf_ = "_epsf" if options.epsf else ""
 
-            try:
-                pupil = 'clear'
-                filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
-                fh = fits.open(filename)
-            except Exception:
-                pupil = 'F444W'
-                filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
-                fh = fits.open(filename)
+            if field == '002': 
+                try:
+                    pupil = 'clear'
+                    filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_realigned-to-vvv{desat}.fits'
+                    fh = fits.open(filename)
+                except Exception:
+                    pupil = 'F444W'
+                    filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_realigned-to-vvv{desat}.fits'
+                    fh = fits.open(filename)
+            else: 
+                try:
+                    pupil = 'clear'
+                    filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
+                    fh = fits.open(filename)
+                except Exception:
+                    pupil = 'F444W'
+                    filename = f'{basepath}/{filtername}/pipeline/jw02221-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
+                    fh = fits.open(filename)
             print(f"Starting on {filename}", flush=True)
 
             im1 = fh

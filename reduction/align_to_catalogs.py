@@ -113,11 +113,7 @@ def realign_to_vvv(
     catfile = None,
     fov_regname='regions/nircam_brick_fov.reg',
     fieldnumber='001',
-<<<<<<< HEAD
-    max_offset=0.4*u.arcsec,
-=======
     proposal_id='2221',
->>>>>>> 6f330691f9d02f7a7bef96579adbaafc65a26fad
     ksmag_limit=15,
     mag_limit=15,
     raoffset=0*u.arcsec, decoffset=0*u.arcsec,
@@ -137,14 +133,9 @@ def realign_to_vvv(
                               module=module, basepath=basepath,
                               fieldnumber=fieldnumber,
                               catfile=catfile, imfile=imfile,
-<<<<<<< HEAD
                               mag_limit=15, 
-                              max_offset=max_offset,
                               raoffset=raoffset, decoffset=decoffset,
-=======
-                              mag_limit=15,
                               proposal_id=proposal_id,
->>>>>>> 6f330691f9d02f7a7bef96579adbaafc65a26fad
                               )
 
 
