@@ -472,6 +472,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                 tblfilename = (f"{basepath}/{filtername}/"
                                f"{filtername.lower()}_{module}{desat}{bgsub}"
                                "_crowdsource_unweighted.fits")
+                print(f"Found {len(stars)} stars. Writing to {tblfilename}.")
                 stars.write(tblfilename, overwrite=True)
                 # add WCS-containing header
                 with fits.open(tblfilename, mode='update', output_verify='fix') as fh:
