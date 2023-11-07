@@ -381,6 +381,10 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             # crowdsource explicitly handles weight=0, so this _should_ work.
             weight[bad] = 0
 
+            #weight.write('/orange/adamginsburg/jwst/cloudc/F405N/weight.fits', overwrite=True)
+            fits.PrimaryHDU(data=weight, 
+                            header=im1['ERR'].header).writeto('/orange/adamginsburg/jwst/cloudc/F405N/weight.fits', 
+                                                              overwrite=True)
 
             filter_table = SvoFps.get_filter_list(facility=telescope, instrument=instrument)
             filter_table.add_index('filterID')
