@@ -254,7 +254,7 @@ def main(filtername, module, Observations=None, regionname='brick',
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 align_fits = fits.open(align_image)
-                pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
+                #pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
                 try:
                     print('Running manual align.')
                     xshift = float(row['xshift (arcsec)'])*u.arcsec
@@ -266,17 +266,22 @@ def main(filtername, module, Observations=None, regionname='brick',
                         xshift = 8*u.arcsec
                         yshift = -0.3*u.arcsec
                     elif visit == '002':
-                        xshift = 3.9*u.arcsec/pixel_scale
-                        yshift = 1*u.arcsec/pixel_scale
+                        xshift = 3.9*u.arcsec
+                        yshift = 1*u.arcsec
                     else:
-                        xshift = 0*u.arcsec/pixel_scale
-                        yshift = 0*u.arcsec/pixel_scale
+                        xshift = 0*u.arcsec
+                        yshift = 0*u.arcsec
+                # ASDF Header
                 fa = asdf.open(align_image)
                 wcsobj = fa.tree['meta']['wcs']
                 ww = adjust_wcs(wcsobj, delta_ra=-yshift, delta_dec=-xshift)
                 tree = fa.tree
                 tree['meta']['wcs'] = ww
-                fa = asdf.fits_embed.AsdfInFits(align_fits, tree)
+                fa = asdf.fits_embed.AsdfInFits(align_fits, tree) 
+                align_fits.writeto(align_image, overwrite=True)
+                # FITS Header
+                align_fits = fits.open(align_image)
+                align_fits[1].header.update(ww.to_fits()[0])
                 align_fits.writeto(align_image, overwrite=True)
                 member['expname'] = align_image
             elif field == '004' and proposal_id == '1182':
@@ -448,7 +453,7 @@ def main(filtername, module, Observations=None, regionname='brick',
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 align_fits = fits.open(align_image)
-                pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
+                #pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
                 try:
                     print('Running manual align.')
                     xshift = float(row['xshift (arcsec)'])*u.arcsec
@@ -460,17 +465,22 @@ def main(filtername, module, Observations=None, regionname='brick',
                         xshift = 8*u.arcsec
                         yshift = -0.3*u.arcsec
                     elif visit == '002':
-                        xshift = 3.9*u.arcsec/pixel_scale
-                        yshift = 1*u.arcsec/pixel_scale
+                        xshift = 3.9*u.arcsec
+                        yshift = 1*u.arcsec
                     else:
-                        xshift = 0*u.arcsec/pixel_scale
-                        yshift = 0*u.arcsec/pixel_scale
+                        xshift = 0*u.arcsec
+                        yshift = 0*u.arcsec
+                # ASDF Header
                 fa = asdf.open(align_image)
                 wcsobj = fa.tree['meta']['wcs']
                 ww = adjust_wcs(wcsobj, delta_ra=-yshift, delta_dec=-xshift)
                 tree = fa.tree
                 tree['meta']['wcs'] = ww
-                fa = asdf.fits_embed.AsdfInFits(align_fits, tree)
+                fa = asdf.fits_embed.AsdfInFits(align_fits, tree) 
+                align_fits.writeto(align_image, overwrite=True)
+                # FITS Header
+                align_fits = fits.open(align_image)
+                align_fits[1].header.update(ww.to_fits()[0])
                 align_fits.writeto(align_image, overwrite=True)
                 member['expname'] = align_image
             elif field == '004' and proposal_id == '1182':
