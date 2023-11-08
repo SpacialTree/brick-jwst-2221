@@ -190,7 +190,7 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
         print(cat, sel, idx, sidx, sep)
         raise ValueError(f"median(dra) = {np.median(dra)}.  np.nanmedian(dra) = {np.nanmedian(dra)}")
 
-    ww.wcs.crval = ww.wcs.crval - [np.median(dra).to(u.deg).value, np.median(ddec).to(u.deg).value] # next
+    ww.wcs.crval = ww.wcs.crval - [np.median(dra).to(u.deg).value, np.median(ddec).to(u.deg).value]
 
     with fits.open(imfile, mode='update') as hdulist:
         print("CRVAL before", hdulist['SCI'].header['CRVAL1'], hdulist['SCI'].header['CRVAL2'])
