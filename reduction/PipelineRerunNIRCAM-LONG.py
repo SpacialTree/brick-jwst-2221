@@ -80,7 +80,13 @@ pix_coords = {'2221':
 
 basepath = '/orange/adamginsburg/jwst/brick/'
 
-def main(filtername, module, Observations=None, regionname='brick', field='001', proposal_id='2221'):
+def main(filtername, module, Observations=None, regionname='brick',
+         field='001', proposal_id='2221', skip_step1and2=False):
+    """
+    skip_step1and2 will not re-fit the ramps to produce the _cal images.  This
+    can save time if you just want to redo the tweakreg steps but already have
+    the zero-frame stuff done.
+    """
     log.info(f"Processing filter {filtername} module {module}")
 
     basepath = f'/orange/adamginsburg/jwst/{regionname}/'
@@ -199,22 +205,23 @@ def main(filtername, module, Observations=None, regionname='brick', field='001',
             asn_data = json.load(f_obj)
 
         print(f"In cwd={os.getcwd()}")
-        # re-calibrate all uncal files -> cal files *without* suppressing first group
-        for member in asn_data['products'][0]['members']:
-            # example filename: jw02221002001_02201_00002_nrcalong_cal.fits
-            assert f'jw0{proposal_id}{field}' in member['expname']
-            print(f"DETECTOR PIPELINE on {member['expname']}")
-            print("Detector1Pipeline step")
-            Detector1Pipeline.call(member['expname'].replace("_cal.fits",
-                                                             "_uncal.fits"),
-                                   save_results=True, output_dir=output_dir,
-                                   steps={'ramp_fit': {'suppress_one_group':False},
-                                          "refpix": {"use_side_ref_pixels": True}})
-            print(f"IMAGE2 PIPELINE on {member['expname']}")
-            Image2Pipeline.call(member['expname'].replace("_cal.fits",
-                                                          "_rate.fits"),
-                                save_results=True, output_dir=output_dir,
-                               )
+        if not skip_step1and2:
+            # re-calibrate all uncal files -> cal files *without* suppressing first group
+            for member in asn_data['products'][0]['members']:
+                # example filename: jw02221002001_02201_00002_nrcalong_cal.fits
+                assert f'jw0{proposal_id}{field}' in member['expname']
+                print(f"DETECTOR PIPELINE on {member['expname']}")
+                print("Detector1Pipeline step")
+                Detector1Pipeline.call(member['expname'].replace("_cal.fits",
+                                                                 "_uncal.fits"),
+                                       save_results=True, output_dir=output_dir,
+                                       steps={'ramp_fit': {'suppress_one_group':False},
+                                              "refpix": {"use_side_ref_pixels": True}})
+                print(f"IMAGE2 PIPELINE on {member['expname']}")
+                Image2Pipeline.call(member['expname'].replace("_cal.fits",
+                                                              "_rate.fits"),
+                                    save_results=True, output_dir=output_dir,
+                                   )
     else:
         raise ValueError(f"Module is {module} - not allowed!")
 
@@ -277,8 +284,9 @@ def main(filtername, module, Observations=None, regionname='brick', field='001',
                 offsets_tbl = Table.read(f'{basepath}/offsets/Offsets_JWST_Brick1182.csv')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 print(f'Running manual align for {row["Group"][0]} {row["Module"][0]} {row["Exposure"][0]}.')
-                rashift = float(row['dra (arcsec)'])*u.arcsec
-                decshift = float(row['ddec (arcsec)'])*u.arcsec
+                rashift = float(row['dra (arcsec)'][0])*u.arcsec
+                decshift = float(row['ddec (arcsec)'][0])*u.arcsec
+                print(f"Shift for {align_image} is {rashift}, {decshift}")
 
                 # ASDF header
                 align_fits = fits.open(align_image)
@@ -370,10 +378,13 @@ def main(filtername, module, Observations=None, regionname='brick', field='001',
         realigned_vvv_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_realigned-to-vvv.fits'
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
                     realigned_vvv_filename)
-
-        realigned = realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, module=module, fieldnumber=field,
-                                   proposal_id=proposal_id,
-                                   imfile=realigned_vvv_filename, ksmag_limit=15 if filtername=='f410m' else 11, mag_limit=15,
+        realigned = realign_to_vvv(filtername=filtername.lower(),
+                                   fov_regname=fov_regname[regionname],
+                                   basepath=basepath, module=module,
+                                   fieldnumber=field, proposal_id=proposal_id,
+                                   imfile=realigned_vvv_filename,
+                                   ksmag_limit=15 if filtername=='f410m' else
+                                   11, mag_limit=15, 
                                    raoffset=raoffset, decoffset=decoffset)
 
         log.info(f"Realigning to refcat (module={module}")
@@ -467,8 +478,9 @@ def main(filtername, module, Observations=None, regionname='brick', field='001',
                 offsets_tbl = Table.read(f'{basepath}/offsets/Offsets_JWST_Brick1182.csv')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                 print(f'Running manual align for {row["Group"][0]} {row["Module"][0]} {row["Exposure"][0]}.')
-                rashift = float(row['dra (arcsec)'])*u.arcsec
-                decshift = float(row['ddec (arcsec)'])*u.arcsec
+                rashift = float(row['dra (arcsec)'][0])*u.arcsec
+                decshift = float(row['ddec (arcsec)'][0])*u.arcsec
+                print(f"Shift for {align_image} is {rashift}, {decshift}")
 
                 # ASDF header
                 align_fits = fits.open(align_image)
@@ -522,7 +534,7 @@ def main(filtername, module, Observations=None, regionname='brick', field='001',
                                     'snr_threshold': 30,
                                     'abs_refcat': abs_refcat,
                                     'save_catalogs': True,
-                                    'catalog_format': 'ecsv',
+                                    'catalog_format': 'fits',
                                     'kernel_fwhm': fwhm_pix,
                                     'nclip': 5,
                                     'sharplo': 0.3,
@@ -599,6 +611,10 @@ if __name__ == "__main__":
     parser.add_option("-d", "--field", dest="field",
                     default='001,002',
                     help="list of target fields", metavar="field")
+    parser.add_option("-s", "--skip_step1and2", dest="skip_step1and2",
+                      default=False,
+                      action='store_true',
+                      help="Skip the image-remaking step?", metavar="skip_Step1and2")
     parser.add_option("-p", "--proposal_id", dest="proposal_id",
                     default='2221',
                     help="proposal id (string)", metavar="proposal_id")
@@ -608,6 +624,7 @@ if __name__ == "__main__":
     modules = options.modules.split(",")
     fields = options.field.split(",")
     proposal_id = options.proposal_id
+    skip_step1and2 = options.skip_step1and2
     print(options)
 
     with open(os.path.expanduser('~/.mast_api_token'), 'r') as fh:
@@ -626,7 +643,8 @@ if __name__ == "__main__":
                 print(f"Main Loop: {proposal_id} + {filtername} + {module} + {field}={field_to_reg_mapping[field]}")
                 results = main(filtername=filtername, module=module, Observations=Observations, field=field,
                                regionname=field_to_reg_mapping[field],
-                               proposal_id=proposal_id
+                               proposal_id=proposal_id,
+                               skip_step1and2=skip_step1and2,
                               )
 
 
