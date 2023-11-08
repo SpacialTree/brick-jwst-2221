@@ -4,7 +4,7 @@ from scipy.ndimage import median_filter, map_coordinates
 import numpy as np
 from astropy.wcs import WCS
 
-#basepath = '/orange/adamginsburg/jwst/brick/'
+basepath = '/orange/adamginsburg/jwst/brick/'
 
 # these were created in notebooks/MedianFilterBackground.ipynb
 background_mapping = { '2221':
@@ -19,12 +19,12 @@ background_mapping = { '2221':
                        },
                         '002':
                        {
-                        'f212n': 'jw02221-o002_t001_nircam_clear-f212n_i2d_medfilt256.fits',
-                        'f187n': 'jw02221-o002_t001_nircam_clear-f187n_i2d_medfilt256.fits',
-                        'f410m': 'jw02221-o002_t001_nircam_clear-f410m_i2d_medfilt128.fits',
-                        'f405n': 'jw02221-o002_t001_nircam_f405n-f444w_i2d_medfilt128.fits',
-                        'f182m': 'jw02221-o002_t001_nircam_clear-f182m_i2d_medfilt256.fits',
-                        'f466n': 'jw02221-o002_t001_nircam_f444w-f466n_i2d_medfilt128.fits',
+                        #'f212n': 'jw02221-o002_t001_nircam_clear-f212n_i2d_medfilt256.fits',
+                        #'f187n': 'jw02221-o002_t001_nircam_clear-f187n_i2d_medfilt256.fits',
+                        #'f410m': 'jw02221-o002_t001_nircam_clear-f410m_i2d_medfilt128.fits',
+                        'f405n': 'jw02221-o002_t001_nircam_clear-f405n-merged_realigned-to-vvv_i2d_medfilt128.fits',
+                        #'f182m': 'jw02221-o002_t001_nircam_clear-f182m_i2d_medfilt256.fits',
+                        #'f466n': 'jw02221-o002_t001_nircam_f444w-f466n_i2d_medfilt128.fits',
                        }
                       }
                      }
