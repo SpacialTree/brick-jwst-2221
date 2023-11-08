@@ -117,7 +117,7 @@ def realign_to_vvv(
     ksmag_limit=15,
     mag_limit=15,
     raoffset=0*u.arcsec, decoffset=0*u.arcsec,
-    ):
+):
     """
     ksmag_limit is a *lower* limit (we want fainter sources from VVV), while mag_limit is an *upper limit* - we want brighter sources from JWST
     """
@@ -133,7 +133,7 @@ def realign_to_vvv(
                               module=module, basepath=basepath,
                               fieldnumber=fieldnumber,
                               catfile=catfile, imfile=imfile,
-                              mag_limit=15, 
+                              mag_limit=15,
                               raoffset=raoffset, decoffset=decoffset,
                               proposal_id=proposal_id,
                               )
