@@ -4,12 +4,13 @@ from scipy.ndimage import median_filter, map_coordinates
 import numpy as np
 from astropy.wcs import WCS
 
-basepath = '/orange/adamginsburg/jwst/brick/'
+#basepath = '/orange/adamginsburg/jwst/brick/'
 
 # these were created in notebooks/MedianFilterBackground.ipynb
 background_mapping = { '2221':
                       { '001':
                        {
+                        'regionname': 'brick',
                         'f212n': 'jw02221-o001_t001_nircam_clear-f212n_i2d_medfilt256.fits',
                         'f187n': 'jw02221-o001_t001_nircam_clear-f187n_i2d_medfilt256.fits',
                         'f410m': 'jw02221-o001_t001_nircam_clear-f410m_i2d_medfilt128.fits',
@@ -19,6 +20,7 @@ background_mapping = { '2221':
                        },
                         '002':
                        {
+                        'regionname': 'cloudc',
                         #'f212n': 'jw02221-o002_t001_nircam_clear-f212n_i2d_medfilt256.fits',
                         #'f187n': 'jw02221-o002_t001_nircam_clear-f187n_i2d_medfilt256.fits',
                         #'f410m': 'jw02221-o002_t001_nircam_clear-f410m_i2d_medfilt128.fits',
@@ -184,7 +186,21 @@ def destreak(frame, percentile=10, median_filter_size=256, overwrite=True, write
                                          )
 
     if use_background_map:
-        data = add_background_map(data, hdu, background_mapping=background_mapping)
+        proposal_id = hdu[0].header['PROGRAM'][1:5]
+        obsid = hdu[0].header['OBSERVTN'].strip()
+        if (proposal_id not in background_mapping or obsid not in background_mapping[proposal_id]:
+            print(f"WARNING: Either the proposal_id: {proposal_id} or obsid: {obsid} are not in background_mapping: {background_mapping}.")
+            hdu[('SCI', 1)].data = data
+            if write:
+                outname = frame.replace("_cal.fits", "_destreak.fits")
+                hdu.writeto(outname, overwrite=overwrite)
+                return outname
+            else:
+                return hdu
+        regionname = background_mapping[proposal_id][obsid]['regionname']
+        basepath = f'/orange/adamginsburg/jwst/{regionname}/'
+        bgmap_path=f'{basepath}/images/'
+        data = add_background_map(data, hdu, background_mapping=background_mapping, bgmap_path=bgmap_path)
 
     hdu[('SCI', 1)].data = data
 
