@@ -438,21 +438,12 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         for member in asn_data['products'][0]['members']:
             print(f"Running destreak={do_destreak} and maybe alignment on {member} for module={module}")
             hdr = fits.getheader(member['expname'])
-<<<<<<< HEAD
-            if filtername in (hdr['PUPIL'], hdr['FILTER']):
-                outname = destreak(member['expname'],
-                                   use_background_map=True,
-                                   background_folder=f'/orange/adamginsburg/jwst/f{regionname}/images/',
-                                   median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
-                member['expname'] = outname
-=======
             if do_destreak:
                 if filtername in (hdr['PUPIL'], hdr['FILTER']):
                     outname = destreak(member['expname'],
                                     use_background_map=True,
                                     median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                     member['expname'] = outname
->>>>>>> 8956cf9c7bab45935076b3afdcce342486561f3e
 
             if field == '002' and (filtername.lower() == 'f405n' or filtername.lower() == 'f410m' or filtername.lower() == 'f466n'):
                 align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
