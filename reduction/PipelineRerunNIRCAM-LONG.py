@@ -260,8 +260,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                 shutil.copy(member['expname'], align_image)
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                align_fits = fits.open(align_image)
-                #pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
+                print('Running manual align.')
                 try:
                     print('Running manual align.')
                     xshift = float(row['xshift (arcsec)'])*u.arcsec
@@ -278,18 +277,9 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     else:
                         xshift = 0*u.arcsec
                         yshift = 0*u.arcsec
-                fa = AsdfInFits.open(align_image)
-                wcsobj = fa.tree['meta']['wcs']
-                ww = adjust_wcs(wcsobj, delta_ra=-yshift, delta_dec=-xshift)
-                tree = fa.tree
-                tree['meta']['wcs'] = ww
-                fa = asdf.fits_embed.AsdfInFits(align_fits, tree) 
-                align_fits.writeto(align_image, overwrite=True)
-                # FITS Header
-                align_fits = fits.open(align_image)
-                align_fits[1].header.update(ww.to_fits()[0])
-                align_fits.writeto(align_image, overwrite=True)
-                member['expname'] = align_image
+                align_fits = ImageModel(member['expname'])
+                align_fits.meta.wcs = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                align_fits.save(align_image)
             elif field == '004' and proposal_id == '1182':
                 align_image = member['expname']
                 offsets_tbl = Table.read(f'{basepath}/offsets/Offsets_JWST_Brick1182.csv')
@@ -478,13 +468,13 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                     median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                     member['expname'] = outname
 
-            if field == '002' and (filtername.lower() == 'f405n' or filtername.lower() == 'f410m' or filtername.lower() == 'f466n'):
-                align_image = member['expname'].replace("_destreak.fits", "_align.fits")#.split('.')[0]+'_align.fits'
+            if field == '002' and (filtername.lower() == 'f405n' or 
+                                   filtername.lower() == 'f410m' or filtername.lower() == 'f466n'):
+                align_image = member['expname'].replace("_destreak.fits", "_align.fits")
                 shutil.copy(member['expname'], align_image)
                 offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                 row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                align_fits = fits.open(align_image)
-                #pixel_scale = np.sqrt(fits.getheader(align_image, ext=1)['PIXAR_A2']*u.arcsec**2)
+                print('Running manual align.')
                 try:
                     print('Running manual align.')
                     xshift = float(row['xshift (arcsec)'])*u.arcsec
@@ -501,18 +491,9 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     else:
                         xshift = 0*u.arcsec
                         yshift = 0*u.arcsec
-                fa = AsdfInFits.open(align_image)
-                wcsobj = fa.tree['meta']['wcs']
-                ww = adjust_wcs(wcsobj, delta_ra=-yshift, delta_dec=-xshift)
-                tree = fa.tree
-                tree['meta']['wcs'] = ww
-                fa = asdf.fits_embed.AsdfInFits(align_fits, tree) 
-                align_fits.writeto(align_image, overwrite=True)
-                # FITS Header
-                align_fits = fits.open(align_image)
-                align_fits[1].header.update(ww.to_fits()[0])
-                align_fits.writeto(align_image, overwrite=True)
-                member['expname'] = align_image
+                align_fits = ImageModel(member['expname'])
+                align_fits.meta.wcs = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                align_fits.save(align_image)
             elif field == '004' and proposal_id == '1182':
                 # I don't think this gets run.
                 align_image = member['expname']
