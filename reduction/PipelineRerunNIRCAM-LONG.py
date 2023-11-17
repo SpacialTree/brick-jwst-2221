@@ -386,7 +386,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             save_results=True)
         print(f"DONE running {asn_file_each}")
 
-        if proposal_id in pix_coords and field in pix_coords[proposal_id]:
+        if proposal_id in pix_coords and field in pix_coords[proposal_id] and False:
             log.info(f"Proposal {proposal_id} found in pix_coords mapping.  Correcting bulk offset")
             fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_i2d.fits'
             f = fits.open(fn)
@@ -599,7 +599,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             save_results=True)
         log.info(f"DONE running {asn_file_merged}.  This should have produced file {asn_data['products'][0]['name']}_i2d.fits")
 
-        if proposal_id in pix_coords and field in pix_coords[proposal_id]:
+        if proposal_id in pix_coords and field in pix_coords[proposal_id] and False:
             fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_i2d.fits'
             f = fits.open(fn)
             w = WCS(f['SCI'].header)
