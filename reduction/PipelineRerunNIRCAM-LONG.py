@@ -232,8 +232,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         raise ValueError(f"Module is {module} - not allowed!")
 
     if module in ('nrca', 'nrcb'):
-        fov_regname = {'brick': 'regions/nircam_brick_fov.reg',
-                      'cloudc': 'regions/nircam_cloudc_fov.reg',
+        fov_regname = {'brick': 'regions_/nircam_brick_fov.reg',
+                      'cloudc': 'regions_/nircam_cloudc_fov.reg',
                       }
 
         with open(asn_file) as f_obj:
