@@ -29,7 +29,11 @@ try:
 except:
     # version 1.6.0, which works
     from photutils.psf import BasicPSFPhotometry as PSFPhotometry, IterativelySubtractedPSFPhotometry as IterativePSFPhotometry, DAOGroup as SourceGrouper
-from photutils.background import MMMBackground, MADStdBackgroundRMS, MedianBackground, Background2D, LocalBackground
+try:
+    from photutils.background import MMMBackground, MADStdBackgroundRMS, MedianBackground, Background2D, LocalBackground
+except:
+    from photutils.background import MMMBackground, MADStdBackgroundRMS, MedianBackground, Background2D
+    from photutils.background import MMMBackground as LocalBackground
 
 from photutils.psf import EPSFBuilder
 from photutils.psf import extract_stars
@@ -87,29 +91,26 @@ class WrappedPSFModel(crowdsource.psf.SimplePSF):
         # explicitly broadcast
         col = np.atleast_1d(col)
         row = np.atleast_1d(row)
-        rows = rows[:, :, None] + row[None, None, :]
-        cols = cols[:, :, None] + col[None, None, :]
+        #rows = rows[:, :, None] + row[None, None, :]
+        #cols = cols[:, :, None] + col[None, None, :]
 
         # photutils seems to use column, row notation
-        # only works with photutils <= 1.6.0
-        stamps = self.psfgridmodel.evaluate(cols, rows, 1, col, row)
+        # only works with photutils <= 1.6.0 - but is wrong there
+        #stamps = self.psfgridmodel.evaluate(cols, rows, 1, col, row)
         # it returns something in (nstamps, row, col) shape
         # pretty sure that ought to be (col, row, nstamps) for crowdsource
 
         # andrew saydjari's version here:
         # it returns something in (nstamps, row, col) shape
-        # stamps = []
-        # for i in range(len(col)):
-        #     stamps.append(self.psfgridmodel.evaluate(cols[:,:,i], rows[:,:,i], 1, col[i], row[i]))
-        # stampsS = np.stack(stamps,axis=0)
-        # stamps = np.transpose(stampsS,axes=(0,2,1))
+        stamps = []
+        for i in range(len(col)):
+            stamps.append(self.psfgridmodel.evaluate(cols+col[i], rows+row[i], 1, col[i], row[i]))
+        stamps = np.transpose(stamps, axes=(0,2,1))
 
         if deriv:
-            dpsfdrow, dpsfdcol = np.gradient(stamps, axis=(0, 1))
-            dpsfdrow = dpsfdrow.T
-            dpsfdcol = dpsfdcol.T
+            dpsfdrow, dpsfdcol = np.gradient(stamps, axis=(1, 2))
 
-        ret = stamps.T
+        ret = stamps
         if parshape != tparshape:
             ret = ret.reshape(stampsz, stampsz)
             if deriv:
@@ -318,34 +319,34 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                     time.sleep(5)
             os.environ['MAST_API_TOKEN'] = api_token.strip()
 
-            has_downloaded = False
-            ntries = 0
-            while not has_downloaded:
-                ntries += 1
-                try:
-                    print("Attempting to download WebbPSF data", flush=True)
-                    nrc = webbpsf.NIRCam()
-                    nrc.load_wss_opd_by_date(f'{obsdate}T00:00:00')
-                    nrc.filter = filt
-                    print(f"Running {module}{desat}{bgsub}")
-                    if module in ('nrca', 'nrcb'):
-                        if 'F4' in filt.upper():
-                            nrc.detector = f'{module.upper()}5' # I think NRCA5 must be the "long" detector?
-                        else:
-                            nrc.detector = f'{module.upper()}1' #TODO: figure out a way to use all 4?
-                        grid = nrc.psf_grid(num_psfs=16, all_detectors=False, verbose=True, save=True)
-                    else:
-                        grid = nrc.psf_grid(num_psfs=16, all_detectors=True, verbose=True, save=True)
-                    has_downloaded = True
-                except (urllib3.exceptions.ReadTimeoutError, requests.exceptions.ReadTimeout, requests.HTTPError) as ex:
-                    print(f"Failed to build PSF: {ex}", flush=True)
-                except Exception as ex:
-                    print(ex, flush=True)
-                    if ntries > 10:
-                        # avoid infinite loops
-                        raise ValueError("Failed to download PSF, probably because of an error listed above")
-                    else:
-                        continue
+            # has_downloaded = False
+            # ntries = 0
+            # while not has_downloaded:
+            #     ntries += 1
+            #     try:
+            #         print("Attempting to download WebbPSF data", flush=True)
+            #         nrc = webbpsf.NIRCam()
+            #         nrc.load_wss_opd_by_date(f'{obsdate}T00:00:00')
+            #         nrc.filter = filt
+            #         print(f"Running {module}{desat}{bgsub}")
+            #         if module in ('nrca', 'nrcb'):
+            #             if 'F4' in filt.upper():
+            #                 nrc.detector = f'{module.upper()}5' # I think NRCA5 must be the "long" detector?
+            #             else:
+            #                 nrc.detector = f'{module.upper()}1' #TODO: figure out a way to use all 4?
+            #             grid = nrc.psf_grid(num_psfs=16, all_detectors=False, verbose=True, save=True)
+            #         else:
+            #             grid = nrc.psf_grid(num_psfs=16, all_detectors=True, verbose=True, save=True)
+            #         has_downloaded = True
+            #     except (urllib3.exceptions.ReadTimeoutError, requests.exceptions.ReadTimeout, requests.HTTPError) as ex:
+            #         print(f"Failed to build PSF: {ex}", flush=True)
+            #     except Exception as ex:
+            #         print(ex, flush=True)
+            #         if ntries > 10:
+            #             # avoid infinite loops
+            #             raise ValueError("Failed to download PSF, probably because of an error listed above")
+            #         else:
+            #             continue
 
             # # there's no way to use a grid across all detectors.
             # # the right way would be to use this as a grid of grids, but that apparently isn't supported.
@@ -361,13 +362,17 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             # yy, xx = np.indices([61,61], dtype=float)
             # grid.x_0 = grid.y_0 = 30
             # psf_model = crowdsource.psf.SimplePSF(stamp=grid(xx,yy))
-            if isinstance(grid, list):
-                print(f"Grid is a list: {grid}")
-                psf_model = WrappedPSFModel(grid[0])
-                dao_psf_model = grid[0]
-            else:
-                psf_model = WrappedPSFModel(grid)
-                dao_psf_model = grid
+            
+            grid = psfgrid = to_griddedpsfmodel(f'{basepath}/psfs/{filtername.upper()}_{proposal_id}_{field}_merged_PSFgrid_oversample2.fits')
+
+            # if isinstance(grid, list):
+            #     print(f"Grid is a list: {grid}")
+            #     psf_model = WrappedPSFModel(grid[0])
+            #     dao_psf_model = grid[0]
+            # else:
+
+            psf_model = WrappedPSFModel(grid)
+            dao_psf_model = grid
             psf_model_blur = psf_model
 
             ww = wcs.WCS(im1[1].header)
