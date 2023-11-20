@@ -232,7 +232,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
     reg_to_field_mapping = {v:k for k,v in field_to_reg_mapping.items()}
     field = reg_to_field_mapping[target]
 
-    basepath = '/blue/adamginsburg/adamginsburg/jwst/{target}/'
+    basepath = f'/blue/adamginsburg/adamginsburg/jwst/{target}/'
 
     nullslice = (slice(None), slice(None))
 
