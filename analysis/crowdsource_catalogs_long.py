@@ -249,24 +249,14 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             bgsub = '_bgsub' if options.bgsub else ''
             epsf_ = "_epsf" if options.epsf else ""
 
-            if field == '002': 
-                try:
-                    pupil = 'clear'
-                    filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_realigned-to-vvv{desat}.fits'
-                    fh = fits.open(filename)
-                except Exception:
-                    pupil = 'F444W'
-                    filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_realigned-to-vvv{desat}.fits'
-                    fh = fits.open(filename)
-            else: 
-                try:
-                    pupil = 'clear'
-                    filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
-                    fh = fits.open(filename)
-                except Exception:
-                    pupil = 'F444W'
-                    filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
-                    fh = fits.open(filename)
+            try:
+                pupil = 'clear'
+                filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
+                fh = fits.open(filename)
+            except Exception:
+                pupil = 'F444W'
+                filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d{desat}.fits'
+                fh = fits.open(filename)
             print(f"Starting on {filename}", flush=True)
 
             im1 = fh
@@ -410,9 +400,9 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             weight[bad] = 0
 
             #weight.write('/orange/adamginsburg/jwst/cloudc/F405N/weight.fits', overwrite=True)
-            fits.PrimaryHDU(data=weight, 
-                            header=im1['ERR'].header).writeto('/orange/adamginsburg/jwst/cloudc/F405N/weight.fits', 
-                                                              overwrite=True)
+            #fits.PrimaryHDU(data=weight, 
+            #                header=im1['ERR'].header).writeto(f'/orange/adamginsburg/jwst/{target}/F405N/weight.fits', 
+            #                                                  overwrite=True)
 
             filter_table = SvoFps.get_filter_list(facility=telescope, instrument=instrument)
             filter_table.add_index('filterID')
