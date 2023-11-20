@@ -255,32 +255,36 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                     median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                     member['expname'] = outname
 
-            if field == '002' and (filtername.lower() == 'f405n' or 
-                                   filtername.lower() == 'f410m' or filtername.lower() == 'f466n'):
-                align_image = member['expname'].replace("_destreak.fits", "_align.fits")
-                shutil.copy(member['expname'], align_image)
-                offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
-                row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                print('Running manual align.')
-                try:
+            if field == '002' and proposal_id == '2221':
+                    align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                    shutil.copy(member['expname'], align_image)
+                    offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
+                    row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                     print('Running manual align.')
-                    xshift = float(row['xshift (arcsec)'])*u.arcsec
-                    yshift = float(row['yshift (arcsec)'])*u.arcsec
-                except:
-                    print('Something went wrong with manual align, running default values.')
-                    visit = member['expname'].split('_')[0][-3:]
-                    if visit == '001':
-                        xshift = 8*u.arcsec
-                        yshift = -0.3*u.arcsec
-                    elif visit == '002':
-                        xshift = 3.9*u.arcsec
-                        yshift = 1*u.arcsec
-                    else:
-                        xshift = 0*u.arcsec
-                        yshift = 0*u.arcsec
-                align_fits = ImageModel(align_image)
-                align_fits.meta.wcs = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
-                align_fits.save(align_image)
+                    try:
+                        xshift = float(row['xshift (arcsec)'])*u.arcsec
+                        yshift = float(row['yshift (arcsec)'])*u.arcsec
+                    except:
+                        log.info('Something went wrong with manual align, running default values.')
+                        visit = member['expname'].split('_')[0][-3:]
+                        if visit == '001':
+                            xshift = 8*u.arcsec
+                            yshift = -0.3*u.arcsec
+                        elif visit == '002':
+                            xshift = 3.9*u.arcsec
+                            yshift = 1*u.arcsec
+                        else:
+                            xshift = 0*u.arcsec
+                            yshift = 0*u.arcsec
+                    align_fits = ImageModel(align_image)
+                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                    align_fits.meta.wcs = ww
+                    align_fits.save(align_image)
+                    align_fits = fits.open(align_image)
+                    align_fits[1].header.update(ww.to_fits()[0])
+                    align_fits.writeto(align_image, overwrite=True)
+                    member['expname'] = align_image
+
             elif field == '004' and proposal_id == '1182':
                 align_image = member['expname']
                 offsets_tbl = Table.read(f'{basepath}/offsets/Offsets_JWST_Brick1182.csv')
@@ -469,32 +473,36 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                     median_filter_size=2048)  # median_filter_size=medfilt_size[filtername])
                     member['expname'] = outname
 
-            if field == '002' and (filtername.lower() == 'f405n' or 
-                                   filtername.lower() == 'f410m' or filtername.lower() == 'f466n'):
-                align_image = member['expname'].replace("_destreak.fits", "_align.fits")
-                shutil.copy(member['expname'], align_image)
-                offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
-                row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                print('Running manual align.')
-                try:
+            if field == '002' and proposal_id == '2221':
+                    align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                    shutil.copy(member['expname'], align_image)
+                    offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
+                    row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
                     print('Running manual align.')
-                    xshift = float(row['xshift (arcsec)'])*u.arcsec
-                    yshift = float(row['yshift (arcsec)'])*u.arcsec
-                except:
-                    print('Something went wrong with manual align, running default values.')
-                    visit = member['expname'].split('_')[0][-3:]
-                    if visit == '001':
-                        xshift = 8*u.arcsec
-                        yshift = -0.3*u.arcsec
-                    elif visit == '002':
-                        xshift = 3.9*u.arcsec
-                        yshift = 1*u.arcsec
-                    else:
-                        xshift = 0*u.arcsec
-                        yshift = 0*u.arcsec
-                align_fits = ImageModel(align_image)
-                align_fits.meta.wcs = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
-                align_fits.save(align_image)
+                    try:
+                        xshift = float(row['xshift (arcsec)'])*u.arcsec
+                        yshift = float(row['yshift (arcsec)'])*u.arcsec
+                    except:
+                        log.info('Something went wrong with manual align, running default values.')
+                        visit = member['expname'].split('_')[0][-3:]
+                        if visit == '001':
+                            xshift = 8*u.arcsec
+                            yshift = -0.3*u.arcsec
+                        elif visit == '002':
+                            xshift = 3.9*u.arcsec
+                            yshift = 1*u.arcsec
+                        else:
+                            xshift = 0*u.arcsec
+                            yshift = 0*u.arcsec
+                    align_fits = ImageModel(align_image)
+                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                    align_fits.meta.wcs = ww
+                    align_fits.save(align_image)
+                    align_fits = fits.open(align_image)
+                    align_fits[1].header.update(ww.to_fits()[0])
+                    align_fits.writeto(align_image, overwrite=True)
+                    member['expname'] = align_image
+
             elif field == '004' and proposal_id == '1182':
                 # I don't think this gets run.
                 align_image = member['expname']
