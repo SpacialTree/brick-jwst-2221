@@ -106,7 +106,12 @@ def save_psfgrid(psfg,  outfilename, overwrite=True):
     xypos = fits.ImageHDU(np.array(psfg.meta['grid_xypos']))
     meta = copy.copy(psfg.meta)
     del meta['grid_xypos']
-    header = fits.Header(meta)
+    try:
+        header = fits.Header(meta)
+    except Exception as ex:
+        header = fits.Header()
+        for key in meta:
+            header[key] = meta[key]
     psfhdu = fits.PrimaryHDU(data=psfg.data, header=header)
     fits.HDUList([psfhdu, xypos]).writeto(outfilename, overwrite=overwrite)
 
@@ -120,10 +125,21 @@ def load_psfgrid(filename):
     return GriddedPSFModel(ndd)
 
 def fix_psfs_with_bad_meta(filename):
+    """
+    cd /orange/adamginsburg/jwst/brick/reduction
+    from make_merged_psf import fix_psfs_with_bad_meta
+    cd /orange/adamginsburg/jwst/brick/psfs
+    import glob
+    for fn in glob.glob("*.fits"):
+        fix_psfs_with_bad_meta(fn)
+    """
     from webbpsf.utils import to_griddedpsfmodel
 
     fh = fits.open(filename, mode='update')
     if 'DET_YX0' in fh[0].header and 'OVERSAMP' in fh[0].header:
+        if 'oversampling' in fh[0].header:
+            oversampling = fh[0].header['oversampling']
+            del fh[0].header['oversampling']
         # done!
         fh.close()
     else:
@@ -146,19 +162,39 @@ def fix_psfs_with_bad_meta(filename):
 
 if __name__ == "__main__":
 
-    filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
-    all_filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m', 'f444w', 'f356w', 'f200w', 'f115w']
-    obs_filters = {'2221': filternames,
-                   '1182': ['f444w', 'f356w', 'f200w', 'f115w']
-                  }
-    obs_ids = {'2221': '001', '1182': '004'}
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-f", "--filternames", dest="filternames",
+                    default='F466N,F405N,F410M,F200W,F115W,F187N,F212N,F182M,F444W,F356W',
+                    help="filter name list", metavar="filternames")
+    parser.add_option("--proposal_id", dest="proposal_id",
+                    default='2221',
+                    help="proposal_id", metavar="proposal_id")
+    parser.add_option("--target", dest="target",
+                    default='brick',
+                    help="target", metavar="target")
+    (options, args) = parser.parse_args()
 
-    basepath='/orange/adamginsburg/jwst/brick/'
+    selected_filters = options.filternames.upper().split(",")
+
+    obs_filters = {'2221': ['F410M', 'F212N', 'F466N', 'F405N', 'F187N', 'F182M'],
+                   '1182': ['F444W', 'F356W', 'F200W', 'F115W']
+                  }
+    obs_ids = {'2221': {'brick': '001', 'cloudc': '002'},
+               '1182': {'brick': '004'}}
+
+    target = options.target
+
+    project_ids = options.proposal_id.split(",")
+
+    basepath = f'/orange/adamginsburg/jwst/{target}/'
     
-    for oversampling, halfstampsize in [(1, 50), (2, 100), (4, 200)]:
-        for project_id in obs_filters:
-            for filtername in obs_filters[project_id]:
-                obs_id = obs_ids[project_id]
+    for oversampling, halfstampsize in [(2, 100), (4, 200), (1, 50), ]:
+        for project_id in project_ids:
+            for filtername in set(obs_filters[project_id]) & set(selected_filters):
+
+                obs_id = obs_ids[project_id][target]
+
                 outfilename = f'{basepath}/psfs/{filtername.upper()}_{project_id}_{obs_id}_merged_PSFgrid_oversample{oversampling}.fits'
                 if not os.path.exists(outfilename):
                     print(f"Making PSF grid {outfilename}")
@@ -168,3 +204,6 @@ if __name__ == "__main__":
                                         oversampling=oversampling,
                                         project_id=project_id, obs_id=obs_id, suffix='merged_i2d')
                     save_psfgrid(psfg, outfilename=outfilename, overwrite=True)
+                else:
+                    print(f"PSF grid {outfilename} exists!  Fixing metadata if needed")
+                    fix_psfs_with_bad_meta(outfilename)
