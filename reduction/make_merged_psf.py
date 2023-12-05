@@ -79,14 +79,16 @@ def make_merged_psf(filtername, basepath, halfstampsize=25,
                 if footprint_contains(xc, yc, dmod.data.shape):
                     # force xc, yc to integers so they stay centered
                     # (mgrid is forced to be integers, and allowing xc/yc not to be would result in arbitrary subpixel shifts)
-                    yy, xx = np.mgrid[int(yc)-halfstampsize:int(yc)+halfstampsize, int(xc)-halfstampsize:int(xc)+halfstampsize]
+                    # oversamplign allows non-integers again though, and increases the grid size
+                    yy, xx = np.mgrid[int(yc)-halfstampsize:int(yc)+halfstampsize:1/oversampling,
+                                      int(xc)-halfstampsize:int(xc)+halfstampsize:1/oversampling]
                     psf = grids[f'{detector.upper()}'].evaluate(x=xx, y=yy, flux=1, x_0=int(xc), y_0=int(yc))
                     psfs.append(psf)
 
         if len(psfs) > 0:
             meanpsf = np.mean(psfs, axis=0)
         else:
-            meanpsf = np.zeros((halfstampsize*2, halfstampsize*2))
+            meanpsf = np.zeros((halfstampsize*2*oversampling, halfstampsize*2*oversampling))
         allpsfs.append(meanpsf)
         psfmeta[f'DET_YX{ii}'] =  (str((float(pgyc), float(pgxc))),
                                    "The #{} PSF's (y,x) detector pixel position".format(ii))
@@ -191,7 +193,7 @@ if __name__ == "__main__":
 
     basepath = f'/orange/adamginsburg/jwst/{target}/'
     
-    for oversampling, halfstampsize in [(2, 100), (4, 200), (1, 50), ]:
+    for oversampling, halfstampsize in [(1, 50), (2, 100), (4, 200), ]:
         for project_id in project_ids:
             for filtername in set(obs_filters[project_id]) & set(selected_filters):
 
