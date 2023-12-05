@@ -11,7 +11,8 @@ def main(basepath = '/orange/adamginsburg/jwst/cloudc/'):
     """
     #basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 
-    tblfilename = (f'{basepath}/F405N/f405n_merged-reproject_crowdsource_nsky0.fits')
+    #tblfilename = (f'{basepath}/F405N/f405n_merged-reproject_crowdsource_nsky0.fits')
+    tblfilename = (f'{basepath}/F405N/f405n_merged_crowdsource_nsky0.fits')
     tbl = Table.read(tblfilename)
 
     sel = ((tbl['qf'] > 0.95) & (tbl['spread_model'] < 0.25) & (tbl['fracflux'] > 0.9) & (tbl['flux'] > 0))
