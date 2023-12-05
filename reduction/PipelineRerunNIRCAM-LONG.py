@@ -278,7 +278,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                             xshift = 0*u.arcsec
                             yshift = 0*u.arcsec
                     align_fits = ImageModel(align_image)
-                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift+0.6*u.arcsec, delta_dec = xshift)
                     align_fits.meta.wcs = ww
                     align_fits.save(align_image)
                     align_fits = fits.open(align_image)
@@ -498,7 +498,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                             xshift = 0*u.arcsec
                             yshift = 0*u.arcsec
                     align_fits = ImageModel(align_image)
-                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift+0.6*u.arcsec, delta_dec = xshift)
                     align_fits.meta.wcs = ww
                     align_fits.save(align_image)
                     align_fits = fits.open(align_image)
