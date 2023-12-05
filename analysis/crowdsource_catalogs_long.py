@@ -511,34 +511,11 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                                                 )
                 print(f"Done with unweighted crowdsource. dt={time.time() - t0}")
                 stars, modsky, skymsky, psf = results_unweighted
-<<<<<<< HEAD
-                stars = Table(stars)
-                # crowdsource explicitly inverts x & y from the numpy convention:
-                # https://github.com/schlafly/crowdsource/issues/11
-                coords = ww.pixel_to_world(stars['y'], stars['x'])
-                stars['skycoord'] = coords
-                stars['x'], stars['y'] = stars['y'], stars['x']
 
-                stars.meta['filename'] = filename
-                stars.meta['filter'] = filtername
-                stars.meta['module'] = module
-                stars.meta['detector'] = detector
-
-                tblfilename = (f"{basepath}/{filtername}/"
-                               f"{filtername.lower()}_{module}{desat}{bgsub}"
-                               "_crowdsource_unweighted.fits")
-                print(f"Found {len(stars)} stars. Writing to {tblfilename}.")
-                stars.write(tblfilename, overwrite=True)
-                # add WCS-containing header
-                with fits.open(tblfilename, mode='update', output_verify='fix') as fh:
-                    fh[0].header.update(im1[1].header)
-                fits.PrimaryHDU(data=skymsky, header=im1[1].header).writeto(f"{basepath}/{filtername}/{filtername.lower()}_{module}{desat}{bgsub}_crowdsource_skymodel_unweighted.fits", overwrite=True)
-=======
                 save_crowdsource_results(results_unweighted, ww, filename,
                     im1=im1, detector=detector, basepath=basepath,
                     filtername=filtername, module=module, desat=desat, bgsub=bgsub,
                     suffix="unweighted")
->>>>>>> adb0e7840275fe669d0586618c77b3963e8b80e6
 
                 zoomcut = slice(128, 256), slice(128, 256)
 
