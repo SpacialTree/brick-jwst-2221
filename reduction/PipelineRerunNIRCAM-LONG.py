@@ -360,7 +360,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             # try forcing searchrad to be tighter to avoid bad crossmatches
             # (the raw data are very well-aligned to begin with, though CARTA
             # can't display them b/c they are using SIP)
-            tweakreg_parameters['searchrad'] = 0.05
+            tweakreg_parameters['searchrad'] = 0.5
             print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
 
         tweakreg_parameters.update({'fitgeometry': 'general',
@@ -376,7 +376,6 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
-                                    'searchrad': 5,
                                     'save_results': True,
                                     })
 
@@ -583,7 +582,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv'
 
             tweakreg_parameters['abs_searchrad'] = 0.4
-            tweakreg_parameters['searchrad'] = 0.05
+            tweakreg_parameters['searchrad'] = 0.5
             print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
 
 
@@ -600,7 +599,6 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
-                                    'searchrad': 5,
                                     'save_results': True,
                                     })
 
