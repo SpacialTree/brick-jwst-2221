@@ -356,7 +356,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             reftbl[:10000].write(f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv', overwrite=True)
             abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv'
 
-            tweakreg_parameters['abs_searchrad'] = 0.4
+            tweakreg_parameters['abs_searchrad'] = 1.5#0.4
             # try forcing searchrad to be tighter to avoid bad crossmatches
             # (the raw data are very well-aligned to begin with, though CARTA
             # can't display them b/c they are using SIP)
@@ -581,7 +581,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             reftbl[:10000].write(f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv', overwrite=True)
             abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv'
 
-            tweakreg_parameters['abs_searchrad'] = 0.4
+            tweakreg_parameters['abs_searchrad'] = 1.5 #0.4
             tweakreg_parameters['searchrad'] = 0.5
             print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
 
