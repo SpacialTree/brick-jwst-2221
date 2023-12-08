@@ -257,7 +257,10 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     member['expname'] = outname
 
             if field == '002' and proposal_id == '2221':
-                    align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                    if do_destreak:
+                        align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                    else: 
+                        align_image = member['expname'].replace("_cal.fits", "_align.fits")
                     shutil.copy(member['expname'], align_image)
                     offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                     row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
@@ -478,7 +481,10 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     member['expname'] = outname
 
             if field == '002' and proposal_id == '2221':
-                    align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                    if do_destreak:
+                        align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                    else: 
+                        align_image = member['expname'].replace("_cal.fits", "_align.fits")
                     shutil.copy(member['expname'], align_image)
                     offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                     row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
