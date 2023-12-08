@@ -376,6 +376,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
+                                    'tolerance': 0.7,
                                     'save_results': True,
                                     })
 
@@ -599,6 +600,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                     'roundlo': -0.25,
                                     'roundhi': 0.25,
                                     'separation': 0.5, # minimum separation; default is 1
+                                    'tolerance': 0.7,
                                     'save_results': True,
                                     })
 
