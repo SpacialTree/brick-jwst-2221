@@ -59,7 +59,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
                    ref_filter='f405n',
                    epsf=False, bgsub=False, desat=False,
                    max_offset=0.15*u.arcsec, target='brick',
-                   basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
+                   basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     basetable = [tb for tb in tbls if tb.meta['filter'] == ref_filter][0].copy()
     basetable.meta['astrometric_reference_wavelength'] = ref_filter
 
@@ -105,9 +105,9 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         for tbl in tbls:
             t0 = time.time()
             wl = tbl.meta['filter']
-            flag_near_saturated(tbl, filtername=wl)
+            flag_near_saturated(tbl, filtername=wl, target=target, basepath=basepath)
             # replace_saturated adds more rows
-            replace_saturated(tbl, filtername=wl)
+            replace_saturated(tbl, filtername=wl, target=target, basepath=basepath)
             # DEBUG print(f"DEBUG: tbl['replaced_saturated'].sum(): {tbl['replaced_saturated'].sum()}")
 
             crds = tbl['skycoord']
@@ -222,7 +222,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
 
 
 def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=False, target='brick',
-                      basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
+                      basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     if epsf:
         raise NotImplementedError
     print()
@@ -292,11 +292,12 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
 
     merge_catalogs(tbls,
                    catalog_type=f'crowdsource{suffix}{"_desat" if desat else ""}{"_bgsub" if bgsub else ""}',
-                   module=module, bgsub=bgsub, desat=desat, epsf=epsf)
+                   module=module, bgsub=bgsub, desat=desat, epsf=epsf, target=target,
+                   basepath=basepath)
 
 
 def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False, bgsub=False, epsf=False, target='brick',
-                  basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
+                  basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
 
     desat = "_unsatstar" if desat else ""
     bgsub = '_bgsub' if bgsub else ''
@@ -361,11 +362,12 @@ def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False,
         tbl.add_column(eflux_jy, name='eflux_jy')
         tbl.add_column(abmag_err, name='emag_ab')
 
-    merge_catalogs(tbls, catalog_type=daophot_type, module=module, bgsub=bgsub, desat=desat, epsf=epsf)
+    merge_catalogs(tbls, catalog_type=daophot_type, module=module, bgsub=bgsub, desat=desat, epsf=epsf, target=target,
+                   basepath=basepath)
 
 
 def flag_near_saturated(cat, filtername, radius=None, target='brick',
-                        basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
+                        basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[target][filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
     satstar_cat = Table.read(satstar_cat_fn)
     satstar_coords = satstar_cat['skycoord_fit']
@@ -393,7 +395,7 @@ def flag_near_saturated(cat, filtername, radius=None, target='brick',
     cat.add_column(near_sat, name=f'near_saturated_{filtername}')
 
 def replace_saturated(cat, filtername, radius=None, target='brick',
-                      basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
+                      basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[target][filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
     satstar_cat = Table.read(satstar_cat_fn)
     satstar_coords = satstar_cat['skycoord_fit']
