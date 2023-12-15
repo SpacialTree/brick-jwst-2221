@@ -29,7 +29,7 @@ pl.rcParams['image.origin'] = 'lower'
 pl.rcParams['figure.figsize'] = (10,8)
 pl.rcParams['figure.dpi'] = 100
 
-basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
+#basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 all_filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m', 'f444w', 'f356w', 'f200w', 'f115w']
 obs_filters = {'2221': filternames,
@@ -37,8 +37,18 @@ obs_filters = {'2221': filternames,
               }
 filter_to_project = {vv: key for key, val in obs_filters.items() for vv in val}
 # need to refactor this somehow for cloudc
-project_obsnum = {'2221': '001',
-                  '1182': '004',
+#project_obsnum = {'2221': '001',
+#                  '1182': '004',
+#                 }
+
+project_obsnum = {
+                  'brick': {
+                      '2221': '001', 
+                      '1182': '004',
+                            },
+                  'cloudc': {
+                      '2221': '002',
+                             },
                  }
 
 
@@ -48,7 +58,8 @@ def getmtime(x):
 def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
                    ref_filter='f405n',
                    epsf=False, bgsub=False, desat=False,
-                   max_offset=0.15*u.arcsec):
+                   max_offset=0.15*u.arcsec, target='brick',
+                   basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
     basetable = [tb for tb in tbls if tb.meta['filter'] == ref_filter][0].copy()
     basetable.meta['astrometric_reference_wavelength'] = ref_filter
 
@@ -210,7 +221,8 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         print(f"Done writing table {tablename}.fits in {time.time()-t0:0.1f} seconds")
 
 
-def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=False):
+def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=False, target='brick',
+                      basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
     if epsf:
         raise NotImplementedError
     print()
@@ -218,7 +230,7 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
           for obsid in obs_filters
           for filn in obs_filters[obsid]
           for x in glob.glob(f"{basepath}/{filn.upper()}/pipeline/"
-                             f"jw0{obsid}-o{project_obsnum[obsid]}_t001_nircam*{filn.lower()}*{module}_i2d.fits")
+                             f"jw0{obsid}-o{project_obsnum[target][obsid]}_t001_nircam*{filn.lower()}*{module}_i2d.fits")
           if f'{module}_' in x or f'{module}1_' in x
          ]
 
@@ -283,7 +295,8 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
                    module=module, bgsub=bgsub, desat=desat, epsf=epsf)
 
 
-def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False, bgsub=False, epsf=False):
+def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False, bgsub=False, epsf=False, target='brick',
+                  basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
 
     desat = "_unsatstar" if desat else ""
     bgsub = '_bgsub' if bgsub else ''
@@ -298,7 +311,7 @@ def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False,
     ]
     imgfns = [x
           for filn in filternames
-          for x in glob.glob(f"{basepath}/{filn.upper()}/pipeline/jw0{filter_to_project[filn.lower()]}-o{project_obsnum[filter_to_project[filn.lower()]]}_t001_nircam*{filn.lower()}*{module}_i2d.fits")
+          for x in glob.glob(f"{basepath}/{filn.upper()}/pipeline/jw0{filter_to_project[filn.lower()]}-o{project_obsnum[target][filter_to_project[filn.lower()]]}_t001_nircam*{filn.lower()}*{module}_i2d.fits")
           if f'{module}_' in x or f'{module}1_' in x
          ]
 
@@ -351,8 +364,9 @@ def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False,
     merge_catalogs(tbls, catalog_type=daophot_type, module=module, bgsub=bgsub, desat=desat, epsf=epsf)
 
 
-def flag_near_saturated(cat, filtername, radius=None):
-    satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
+def flag_near_saturated(cat, filtername, radius=None, target='brick',
+                        basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
+    satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[target][filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
     satstar_cat = Table.read(satstar_cat_fn)
     satstar_coords = satstar_cat['skycoord_fit']
 
@@ -378,8 +392,9 @@ def flag_near_saturated(cat, filtername, radius=None):
 
     cat.add_column(near_sat, name=f'near_saturated_{filtername}')
 
-def replace_saturated(cat, filtername, radius=None):
-    satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
+def replace_saturated(cat, filtername, radius=None, target='brick',
+                      basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'):
+    satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[target][filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
     satstar_cat = Table.read(satstar_cat_fn)
     satstar_coords = satstar_cat['skycoord_fit']
 
@@ -510,40 +525,57 @@ def main():
     print("Starting main")
     import time
     t0 = time.time()
-    for module in ( 'merged', 'merged-reproject', 'nrca', 'nrcb', ):
+    
+    from optparse import OptionParser
+    parser = OptionParser()
+    parser.add_option("-m", "--modules", dest="modules",
+                    default='merged,nrca,nrcb,merged-reproject',
+                    help="module list", metavar="modules")
+    parser.add_option("--target", dest="target",
+                    default='brick',
+                    help="target", metavar="target")
+    (options, args) = parser.parse_args()
+
+    modules = options.modules.split(",")
+    target = options.target
+    print(options)
+
+    basepath = f'/blue/adamginsburg/adamginsburg/jwst/{target}/'
+    
+    for module in modules:
         for desat in (False, True):
             for bgsub in (False, True):
                 for epsf in (False, True):
                     t0 = time.time()
                     print()
-                    print(f'crowdsource {module} desat={desat} bgsub={bgsub} epsf={epsf}. ')
+                    print(f'crowdsource {module} desat={desat} bgsub={bgsub} epsf={epsf} target={target}. ')
                     try:
-                        merge_crowdsource(module=module, desat=desat, bgsub=bgsub, epsf=epsf)
+                        merge_crowdsource(module=module, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
                     except Exception as ex:
                         print(f"Living with this error: {ex}, {type(ex)}, {str(ex)}")
                     try:
                         print(f'crowdsource unweighted {module}', flush=True)
-                        merge_crowdsource(module=module, suffix='_unweighted', desat=desat, bgsub=bgsub, epsf=epsf)
+                        merge_crowdsource(module=module, suffix='_unweighted', desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
                     except Exception as ex:
                         print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                         raise ex
                     try:
                         for suffix in ("_nsky0", "_nsky1", ):#"_nsky15"):
                             print(f'crowdsource {suffix} {module}')
-                            merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf)
+                            merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
                     except Exception as ex:
                         print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                     print(f'crowdsource phase done.  time elapsed={time.time()-t0}')
                     t0 = time.time()
                     print()
                     try:
-                        print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf}', flush=True)
-                        merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf)
+                        print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf} target={target}', flush=True)
+                        merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
                     except Exception as ex:
                         print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                     try:
-                        print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf}')
-                        merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf)
+                        print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf} target={target}')
+                        merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
                     except Exception as ex:
                         print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                     print(f'dao phase done.  time elapsed={time.time()-t0}')
