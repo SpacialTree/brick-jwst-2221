@@ -15,7 +15,12 @@ from astropy import table
 from astropy import units as u
 from astroquery.svo_fps import SvoFps
 
-from photutils import CircularAperture, EPSFBuilder, find_peaks, CircularAnnulus
+try:
+    from photutils.apeture import CircularAnnulus, CircularAperture
+    from photutils.psf import EPSFBuilder
+    from photutils.detection import find_peaks
+except ImportError:
+    from photutils import CircularAperture, EPSFBuilder, find_peaks, CircularAnnulus
 from photutils.detection import DAOStarFinder, IRAFStarFinder
 from photutils.psf import DAOGroup, IntegratedGaussianPRF, extract_stars, IterativelySubtractedPSFPhotometry, BasicPSFPhotometry
 from photutils.background import MMMBackground, MADStdBackgroundRMS
@@ -187,7 +192,10 @@ def main(basetable, ww):
                     (((basetable['mag_ab_f410m'] - basetable['mag_ab_f466n']) +
                       (basetable['emag_ab_f410m']**2 + basetable['emag_ab_f466n']**2)**0.5) < (-0.75+zeropoint_offset_410_466))
                     )
-    assert (blue_410_466 & basetable['mag_ab_410m405'].mask).sum() == 0
+    # this assertion is presumably because blue_410_466 was being computed from 410m405 before
+    # assert (blue_410_466 & basetable['mag_ab_410m405'].mask).sum() == 0
+    # now this is the correct assertion
+    assert (blue_410m405_466 & basetable['mag_ab_410m405'].mask).sum() == 0
     blue_410_405 = oksep & ~any_saturated & (~(basetable['mag_ab_410m405'].mask)) & ((basetable['mag_ab_410m405'] - basetable['mag_ab_f405n']) + (basetable['emag_ab_f410m']**2 + basetable['emag_ab_f405n']**2)**0.5 < -2)
     blue_405_410 = (oksep & ~any_saturated & (~(basetable['mag_ab_410m405'].mask)) &
                     ((basetable['mag_ab_405m410'] - basetable['mag_ab_410m405']) +
