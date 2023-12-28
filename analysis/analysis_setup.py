@@ -42,7 +42,7 @@ pl.rcParams['figure.dpi'] = 100
 pl.rcParams['font.size'] = 16
 
 
-basepath = '/orange/adamginsburg/jwst/brick/'
+basepath = '/orange/adamginsburg/jwst/cloudc/'
 
 sys.path.append(f'{basepath}/analysis/')
 sys.path.append(f'{basepath}/reduction/')
