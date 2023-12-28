@@ -4,6 +4,7 @@ from astropy.io import fits
 from scipy.ndimage import median_filter, map_coordinates
 import numpy as np
 from astropy.wcs import WCS
+import scipy
 
 basepath = '/orange/adamginsburg/jwst/brick/'
 
