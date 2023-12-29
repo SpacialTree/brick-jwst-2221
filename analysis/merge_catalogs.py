@@ -32,10 +32,22 @@ pl.rcParams['figure.dpi'] = 100
 #basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 all_filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m', 'f444w', 'f356w', 'f200w', 'f115w']
-obs_filters = {'2221': filternames,
-               '1182': ['f444w', 'f356w', 'f200w', 'f115w']
-              }
-filter_to_project = {vv: key for key, val in obs_filters.items() for vv in val}
+#obs_filters = {'2221': filternames,
+#               '1182': ['f444w', 'f356w', 'f200w', 'f115w']
+#              }
+obs_filters = {
+                'brick': {
+                    '2221': filternames,
+                    '1182': ['f444w', 'f356w', 'f200w', 'f115w'],
+                          },
+                'cloudc': {
+                    '2221': filternames,
+                           },
+               }
+# Using the 'brick' keyword here makes it work for now, need to figure out how to 
+# refactor it in cases where there are more filters available for other targets! 
+#filter_to_project = {vv: key for key, val in obs_filters.items() for vv in val}
+filter_to_project = {vv: key for key, val in obs_filters['brick'].items() for vv in val}
 # need to refactor this somehow for cloudc
 #project_obsnum = {'2221': '001',
 #                  '1182': '004',
@@ -60,6 +72,8 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
                    epsf=False, bgsub=False, desat=False,
                    max_offset=0.15*u.arcsec, target='brick',
                    basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
+    print(f'Starting merge catalogs: catalog_type: {catalog_type} module: {module} target: {target}')
+
     basetable = [tb for tb in tbls if tb.meta['filter'] == ref_filter][0].copy()
     basetable.meta['astrometric_reference_wavelength'] = ref_filter
 
@@ -226,9 +240,10 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
     if epsf:
         raise NotImplementedError
     print()
+    print(f'Starting merge crowdsource module: {module} suffix: {suffix} target: {target}')
     imgfns = [x
-          for obsid in obs_filters
-          for filn in obs_filters[obsid]
+          for obsid in obs_filters[target]
+          for filn in obs_filters[target][obsid]
           for x in glob.glob(f"{basepath}/{filn.upper()}/pipeline/"
                              f"jw0{obsid}-o{project_obsnum[target][obsid]}_t001_nircam*{filn.lower()}*{module}_i2d.fits")
           if f'{module}_' in x or f'{module}1_' in x
@@ -240,13 +255,19 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
     jfilts = SvoFps.get_filter_list('JWST')
     jfilts.add_index('filterID')
 
-    filternames = [filn for obsid in obs_filters for filn in obs_filters[obsid]]
+    filternames = [filn for obsid in obs_filters[target] for filn in obs_filters[target][obsid]]
     catfns = [x
               for filn in filternames
               for x in glob.glob(f"{basepath}/{filn.upper()}/{filn.lower()}*{module}{desat}{bgsub}_crowdsource{suffix}.fits")
              ]
-    if len(catfns) != 10:
-        raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
+    if target == 'brick':
+        if len(catfns) != 10:
+            raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
+    elif target == 'cloudc':
+        if len(catfns) != 6:
+            ## un-comment once all catalogs have been made! 
+            #raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
+            print(f'ValueError: len(catfns) = {len(catfns)}.  catfns: {catfns}')
     for catfn in catfns:
         print(catfn, getmtime(catfn))
     tbls = [Table.read(catfn) for catfn in catfns]
@@ -270,6 +291,7 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
             crds = tbl['skycoord']
         tbl.meta['pixelscale_deg2'] = ww.proj_plane_pixel_area()
         tbl.meta['pixelscale_arcsec'] = (ww.proj_plane_pixel_area()**0.5).to(u.arcsec)
+        print('Calculating Flux [Jy]')
         flux_jy = (tbl['flux'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * tbl['fwhm']**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
         eflux_jy = (tbl['dflux'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * tbl['fwhm']**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
         with np.errstate(all='ignore'):

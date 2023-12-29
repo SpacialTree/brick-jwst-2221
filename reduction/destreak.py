@@ -5,6 +5,7 @@ from scipy.ndimage import median_filter, map_coordinates
 import numpy as np
 from astropy.wcs import WCS
 import scipy
+import scipy.ndimage
 
 basepath = '/orange/adamginsburg/jwst/brick/'
 
