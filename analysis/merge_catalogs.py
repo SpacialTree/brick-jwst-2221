@@ -260,14 +260,10 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
               for filn in filternames
               for x in glob.glob(f"{basepath}/{filn.upper()}/{filn.lower()}*{module}{desat}{bgsub}_crowdsource{suffix}.fits")
              ]
-    if target == 'brick':
-        if len(catfns) != 10:
-            raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
-    elif target == 'cloudc':
-        if len(catfns) != 6:
-            ## un-comment once all catalogs have been made! 
-            #raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
-            print(f'ValueError: len(catfns) = {len(catfns)}.  catfns: {catfns}')
+    if target == 'brick' and len(catfns) != 10:
+        raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
+    elif target == 'cloudc' and len(catfns) != 6:
+        raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
     for catfn in catfns:
         print(catfn, getmtime(catfn))
     tbls = [Table.read(catfn) for catfn in catfns]

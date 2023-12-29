@@ -625,30 +625,23 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             save_results=True)
         log.info(f"DONE running {asn_file_merged}.  This should have produced file {asn_data['products'][0]['name']}_i2d.fits")
 
-        #if proposal_id in pix_coords and field in pix_coords[proposal_id]:
-        #    fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_i2d.fits'
-        #    f = fits.open(fn)
-        #    w = WCS(f['SCI'].header)
-        #    sky = w.pixel_to_world(pix_coords[proposal_id][field][module][0], pix_coords[proposal_id][field][module][1])
-        #    star_coord = pix_coords[proposal_id][field]['star_coord']
-        #    decoffset = sky.dec - star_coord.dec
-        #    raoffset = sky.ra - star_coord.ra
-        #else:
-        #    decoffset = 0.0 * u.arcsec
-        #    raoffset = 0.0 * u.arcsec
+        if False: #proposal_id in pix_coords and field in pix_coords[proposal_id]:
+            fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_i2d.fits'
+            f = fits.open(fn)
+            w = WCS(f['SCI'].header)
+            sky = w.pixel_to_world(pix_coords[proposal_id][field][module][0], pix_coords[proposal_id][field][module][1])
+            star_coord = pix_coords[proposal_id][field]['star_coord']
+            decoffset = sky.dec - star_coord.dec
+            raoffset = sky.ra - star_coord.ra
+        else:
+            decoffset = 0.0 * u.arcsec
+            raoffset = 0.0 * u.arcsec
 
         log.info(f"Realigning to VVV (module={module}")
         realigned_vvv_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-vvv.fits'
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
                     realigned_vvv_filename)
-<<<<<<< HEAD
-        realigned = realign_to_vvv(filtername=filtername.lower(), fov_regname=fov_regname[regionname], basepath=basepath, 
-                                   module=module, fieldnumber=field, proposal_id=proposal_id,
-                                   imfile=realigned_vvv_filename,
-                                   ksmag_limit=15 if filtername=='f410m' else 11,
-                                   mag_limit=18 if filtername=='f115w' else 15,
-                                   )
-=======
+
         realigned = realign_to_vvv(filtername=filtername.lower(),
                                    fov_regname=fov_regname[regionname], basepath=basepath, module=module,
                                    fieldnumber=field, proposal_id=proposal_id,
@@ -657,7 +650,6 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                    ksmag_limit=15 if filtername.lower() == 'f410m' else 11,
                                    mag_limit=18 if filtername.lower() == 'f115w' else 15,
                                    raoffset=raoffset, decoffset=decoffset)
->>>>>>> 980835cf3322ffad0d7273cabb7a4e384dfcc366
 
         log.info(f"Realigning to refcat (module={module}")
         realigned_refcat_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-refcat.fits'
