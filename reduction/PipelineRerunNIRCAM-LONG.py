@@ -266,7 +266,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     shutil.copy(member['expname'], align_image)
                     offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                     row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                    print('Running manual align.')
+                    log.info(f'Running manual align on {align_image}')
                     try:
                         xshift = float(row['xshift (arcsec)'])*u.arcsec
                         yshift = float(row['yshift (arcsec)'])*u.arcsec
@@ -274,16 +274,16 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                         log.info('Something went wrong with manual align, running default values.')
                         visit = member['expname'].split('_')[0][-3:]
                         if visit == '001':
-                            xshift = 8*u.arcsec
-                            yshift = -0.3*u.arcsec
+                            xshift = 7.95*u.arcsec
+                            yshift = 0.6*u.arcsec
                         elif visit == '002':
-                            xshift = 3.9*u.arcsec
-                            yshift = 1*u.arcsec
+                            xshift = 3.85*u.arcsec
+                            yshift = 1.57*u.arcsec
                         else:
                             xshift = 0*u.arcsec
                             yshift = 0*u.arcsec
                     align_fits = ImageModel(align_image)
-                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift+0.6*u.arcsec, delta_dec = xshift)
+                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
                     align_fits.meta.wcs = ww
                     align_fits.save(align_image)
                     align_fits = fits.open(align_image)
@@ -495,7 +495,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     shutil.copy(member['expname'], align_image)
                     offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
                     row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                    print('Running manual align.')
+                    log.info(f'Running manual align on {align_image}')
                     try:
                         xshift = float(row['xshift (arcsec)'])*u.arcsec
                         yshift = float(row['yshift (arcsec)'])*u.arcsec
@@ -503,16 +503,16 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                         log.info('Something went wrong with manual align, running default values.')
                         visit = member['expname'].split('_')[0][-3:]
                         if visit == '001':
-                            xshift = 8*u.arcsec
-                            yshift = -0.3*u.arcsec
+                            xshift = 7.95*u.arcsec
+                            yshift = 0.6*u.arcsec
                         elif visit == '002':
-                            xshift = 3.9*u.arcsec
-                            yshift = 1*u.arcsec
+                            xshift = 3.85*u.arcsec
+                            yshift = 1.57*u.arcsec
                         else:
                             xshift = 0*u.arcsec
                             yshift = 0*u.arcsec
                     align_fits = ImageModel(align_image)
-                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift+0.6*u.arcsec, delta_dec = xshift)
+                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
                     align_fits.meta.wcs = ww
                     align_fits.save(align_image)
                     align_fits = fits.open(align_image)
