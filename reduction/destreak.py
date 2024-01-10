@@ -4,6 +4,7 @@ from astropy.io import fits
 from scipy.ndimage import median_filter, map_coordinates
 import numpy as np
 from astropy.wcs import WCS
+from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
 import scipy
 import scipy.ndimage
 
@@ -64,9 +65,11 @@ def compute_zero_spacing_approximation(filename, ext=('SCI', 1), dx=128,
 
 
     if smooth:
+        kernel16 = Gaussian2DKernel(16)
+        inter16 = interpolate_replace_nans(array=img, kernel=kernal16)
         y, x = np.mgrid[:dx, :dx]
         circle = ((x-dx/2)**2 + (y-dx/2)**2) < (dx/2)**2
-        arr = scipy.ndimage.percentile_filter(img, percentile,
+        arr = scipy.ndimage.percentile_filter(inter16, percentile,
                                               #size=(dx, dx),
                                               footprint=circle,
                                               mode='reflect',
