@@ -66,7 +66,7 @@ def compute_zero_spacing_approximation(filename, ext=('SCI', 1), dx=128,
 
     if smooth:
         kernel16 = Gaussian2DKernel(16)
-        inter16 = interpolate_replace_nans(array=img, kernel=kernal16)
+        inter16 = interpolate_replace_nans(array=img, kernel=kernel16)
         y, x = np.mgrid[:dx, :dx]
         circle = ((x-dx/2)**2 + (y-dx/2)**2) < (dx/2)**2
         arr = scipy.ndimage.percentile_filter(inter16, percentile,
