@@ -29,9 +29,12 @@ background_mapping = { '2221':
                         '002':
                        {
                         'regionname': 'cloudc',
-                        'f405n': 'jw02221-o002_t001_nircam_clear-f405n-merged-nodestreak_i2d_nomask-medfilt128.fits',
-                        'f410m': 'jw02221-o002_t001_nircam_clear-f410m-merged-nodestreak_i2d_nomask-medfilt128.fits',
-                        'f466n': 'jw02221-o002_t001_nircam_clear-f466n-merged-nodestreak_i2d_nomask-medfilt128.fits',
+                        'f405n': 'jw02221-o002_t001_nircam_clear-f405n-merged-nodestreak_i2d-perfilt64.fits',
+                        'f410m': 'jw02221-o002_t001_nircam_clear-f410m-merged-nodestreak_i2d-perfilt64.fits',
+                        'f466n': 'jw02221-o002_t001_nircam_clear-f466n-merged-nodestreak_i2d-perfilt64.fits',
+                        'f212n': 'jw02221-o002_t001_nircam_clear-f212n-merged-reproject-nodestreak_i2d-perfilt128.fits',
+                        'f187n': 'jw02221-o002_t001_nircam_clear-f187n-merged-reproject-nodestreak_i2d-perfilt128.fits',
+                        'f182m': 'jw02221-o002_t001_nircam_clear-f182m-merged-reproject-nodestreak_i2d-perfilt128.fits',
                        }
                       }
                      }
