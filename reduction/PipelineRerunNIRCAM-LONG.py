@@ -269,7 +269,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     log.info(f'Running manual align on {align_image}')
                     try:
                         xshift = float(row['xshift (arcsec)'])*u.arcsec
-                        yshift = float(row['yshift (arcsec)'])*u.arcsec
+                        yshift = float(row['yshift (arcsec)'])*u.arcsec + 0.8*u.arcsec
                     except:
                         log.info('Something went wrong with manual align, running default values.')
                         visit = member['expname'].split('_')[0][-3:]
@@ -282,6 +282,14 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                         else:
                             xshift = 0*u.arcsec
                             yshift = 0*u.arcsec
+                    if filtername.upper() in ('F212N', 'F187N', 'F182M'):
+                        print('Short wavelength correction.')
+                        if 'nrca' in filename.lower():
+                            xshift += 0.06*u.arcsec
+                            yshift += -0.25*u.arcsec
+                        elif 'nrcb' in filename.lower():
+                            xshift += 0.05*u.arcsec
+                            yshift += 0.0*u.arcsec
                     align_fits = ImageModel(align_image)
                     ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
                     align_fits.meta.wcs = ww
@@ -498,7 +506,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     log.info(f'Running manual align on {align_image}')
                     try:
                         xshift = float(row['xshift (arcsec)'])*u.arcsec
-                        yshift = float(row['yshift (arcsec)'])*u.arcsec
+                        yshift = float(row['yshift (arcsec)'])*u.arcsec + 0.8*u.arcsec
                     except:
                         log.info('Something went wrong with manual align, running default values.')
                         visit = member['expname'].split('_')[0][-3:]
@@ -511,6 +519,14 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                         else:
                             xshift = 0*u.arcsec
                             yshift = 0*u.arcsec
+                    if filtername.upper() in ('F212N', 'F187N', 'F182M'):
+                        print('Short wavelength correction.')
+                        if 'nrca' in filename.lower():
+                            xshift += 0.06*u.arcsec
+                            yshift += -0.25*u.arcsec
+                        elif 'nrcb' in filename.lower():
+                            xshift += 0.05*u.arcsec
+                            yshift += 0.0*u.arcsec
                     align_fits = ImageModel(align_image)
                     ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
                     align_fits.meta.wcs = ww
