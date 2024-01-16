@@ -235,12 +235,8 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         print(f"Done writing table {tablename}.fits in {time.time()-t0:0.1f} seconds")
 
 
-<<<<<<< HEAD
-def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=False, target='brick',
+def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=False, fitpsf=False, target='brick',
                       basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
-=======
-def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=False, fitpsf=False):
->>>>>>> d62b7ad780207f7a7720822dda5c5d20ba6bde09
     if epsf:
         raise NotImplementedError
     print()
@@ -571,55 +567,19 @@ def main():
         for desat in (False, True):
             for bgsub in (False, True):
                 for epsf in (False, True):
-<<<<<<< HEAD
-                    t0 = time.time()
-                    print()
-                    print(f'crowdsource {module} desat={desat} bgsub={bgsub} epsf={epsf} target={target}. ')
-                    try:
-                        merge_crowdsource(module=module, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
-                    except Exception as ex:
-                        print(f"Living with this error: {ex}, {type(ex)}, {str(ex)}")
-                    try:
-                        print(f'crowdsource unweighted {module}', flush=True)
-                        merge_crowdsource(module=module, suffix='_unweighted', desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
-                    except NotImplementedError:
-                        continue
-                    except Exception as ex:
-                        print(f"Exception for unweighted crowdsource: {ex}, {type(ex)}, {str(ex)}")
-                        #raise ex
-                    try:
-                        for suffix in ("_nsky0", "_nsky1", ):#"_nsky15"):
-                            print(f'crowdsource {suffix} {module}')
-                            merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
-                    except Exception as ex:
-                        print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
-                    print(f'crowdsource phase done.  time elapsed={time.time()-t0}')
-                    t0 = time.time()
-                    print()
-                    try:
-                        print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf} target={target}', flush=True)
-                        merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
-                    except Exception as ex:
-                        print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
-                    try:
-                        print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf} target={target}')
-                        merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf, target=target, basepath=basepath)
-                    except Exception as ex:
-                        print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
-                    print(f'dao phase done.  time elapsed={time.time()-t0}')
-                    print()
-=======
                     for fitpsf in (False, True):
                         t0 = time.time()
                         print()
-                        print(f'crowdsource {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf}. ')
+                        print(f'crowdsource {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}. ')
                         try:
-                            merge_crowdsource(module=module, desat=desat, bgsub=bgsub, epsf=epsf, fitpsf=fitpsf)
+                            merge_crowdsource(module=module, desat=desat, bgsub=bgsub, epsf=epsf, 
+                                              fitpsf=fitpsf, target=target, basepath=basepath)
                         except Exception as ex:
                             print(f"Living with this error: {ex}, {type(ex)}, {str(ex)}")
                         try:
                             print(f'crowdsource unweighted {module}', flush=True)
-                            merge_crowdsource(module=module, suffix='_unweighted', desat=desat, bgsub=bgsub, epsf=epsf, fitpsf=fitpsf)
+                            merge_crowdsource(module=module, suffix='_unweighted', desat=desat, bgsub=bgsub, epsf=epsf, 
+                                              fitpsf=fitpsf, target=target, basepath=basepath)
                         except NotImplementedError:
                             continue
                         except Exception as ex:
@@ -628,25 +588,27 @@ def main():
                         try:
                             for suffix in ("_nsky0", "_nsky1", ):#"_nsky15"):
                                 print(f'crowdsource {suffix} {module}')
-                                merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf, fitpsf=fitpsf)
+                                merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf, 
+                                                  fitpsf=fitpsf, target=target, basepath=basepath)
                         except Exception as ex:
                             print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                         print(f'crowdsource phase done.  time elapsed={time.time()-t0}')
                         t0 = time.time()
                         print()
                         try:
-                            print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf}', flush=True)
-                            merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf, fitpsf=fitpsf)
+                            print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}', flush=True)
+                            merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf, 
+                                          fitpsf=fitpsf, target=target, basepath=basepath)
                         except Exception as ex:
                             print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                         try:
-                            print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf}')
-                            merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf, fitpsf=fitpsf)
+                            print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}')
+                            merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf, 
+                                          fitpsf=fitpsf, target=target, basepath=basepath)
                         except Exception as ex:
                             print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                         print(f'dao phase done.  time elapsed={time.time()-t0}')
                         print()
->>>>>>> d62b7ad780207f7a7720822dda5c5d20ba6bde09
 
 if __name__ == "__main__":
     main()
