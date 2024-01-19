@@ -284,10 +284,10 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                             yshift = 0*u.arcsec
                     if filtername.upper() in ('F212N', 'F187N', 'F182M'):
                         print('Short wavelength correction.')
-                        if 'nrca' in filename.lower():
+                        if 'nrca' in align_image.lower():
                             xshift += 0.06*u.arcsec
                             yshift += -0.25*u.arcsec
-                        elif 'nrcb' in filename.lower():
+                        elif 'nrcb' in align_image.lower():
                             xshift += 0.05*u.arcsec
                             yshift += 0.0*u.arcsec
                     align_fits = ImageModel(align_image)
@@ -521,10 +521,10 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                             yshift = 0*u.arcsec
                     if filtername.upper() in ('F212N', 'F187N', 'F182M'):
                         print('Short wavelength correction.')
-                        if 'nrca' in filename.lower():
+                        if 'nrca' in align_image.lower():
                             xshift += 0.06*u.arcsec
                             yshift += -0.25*u.arcsec
-                        elif 'nrcb' in filename.lower():
+                        elif 'nrcb' in align_image.lower():
                             xshift += 0.05*u.arcsec
                             yshift += 0.0*u.arcsec
                     align_fits = ImageModel(align_image)
