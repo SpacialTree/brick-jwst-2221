@@ -285,11 +285,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     if filtername.upper() in ('F212N', 'F187N', 'F182M'):
                         print('Short wavelength correction.')
                         if 'nrca' in align_image.lower():
-                            xshift += 0.06*u.arcsec
-                            yshift += -0.25*u.arcsec
-                        elif 'nrcb' in align_image.lower():
-                            xshift += 0.05*u.arcsec
-                            yshift += 0.0*u.arcsec
+                            xshift += 0.1*u.arcsec
+                            yshift += -0.23*u.arcsec
                     align_fits = ImageModel(align_image)
                     ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
                     align_fits.meta.wcs = ww
@@ -522,11 +519,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     if filtername.upper() in ('F212N', 'F187N', 'F182M'):
                         print('Short wavelength correction.')
                         if 'nrca' in align_image.lower():
-                            xshift += 0.06*u.arcsec
-                            yshift += -0.25*u.arcsec
-                        elif 'nrcb' in align_image.lower():
-                            xshift += 0.05*u.arcsec
-                            yshift += 0.0*u.arcsec
+                            xshift += 0.1*u.arcsec
+                            yshift += -0.23*u.arcsec
                     align_fits = ImageModel(align_image)
                     ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
                     align_fits.meta.wcs = ww
