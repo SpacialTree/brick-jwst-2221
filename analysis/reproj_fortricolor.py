@@ -19,8 +19,8 @@ files_with_stars = [
     fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f405n-merged_i2d.fits'),
     fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f466n-merged_i2d.fits'),
     fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f410m-merged_i2d.fits'),
-    fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f212n-merged-reproject_i2d.fits'),
-    fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f182m-merged-reproject_i2d.fits'),
+    fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f212n-merged_i2d.fits'),
+    fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f182m-merged_i2d.fits'),
     fits.open(f'{basepath}/images/jw02221-o002_t001_nircam_clear-f187n-merged_i2d.fits'),
                     ]
 
