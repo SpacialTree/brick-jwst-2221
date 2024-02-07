@@ -20,14 +20,14 @@ files = glob.glob('/orange/adamginsburg/jwst/cloudc/alma/cutouts/cloudc_*')
 
 # Read the region files
 print('Reading region files.')
-reg = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/nircam_cloudc_fov_perp.reg')
-reg_cloud = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/large_cloud.reg')
-reg_sub = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/sub_cloud.reg')
-reg_hmsfr = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/hmsfr.reg')
-reg_filament = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/filament.reg')
-reg_double = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/double_peak.reg')
+reg = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions_/nircam_cloudc_fov_perp.reg')
+reg_cloud = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions_/large_cloud.reg')
+reg_sub = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions_/sub_cloud.reg')
+reg_hmsfr = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions_/hmsfr.reg')
+reg_filament = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions_/filament.reg')
+reg_double = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions_/double_peak.reg')
 
-reg_fov = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/fov.reg')
+reg_fov = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions_/fov.reg')
 
 ### Cubes
 print('Opening Cubes')
