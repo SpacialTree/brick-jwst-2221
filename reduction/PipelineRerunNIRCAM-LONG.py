@@ -529,7 +529,6 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     align_fits[1].header.update(ww.to_fits()[0])
                     align_fits.writeto(align_image, overwrite=True)
                     member['expname'] = align_image
-
             elif field == '004' and proposal_id == '1182':
                 # I don't think this gets run.
                 align_image = member['expname']
