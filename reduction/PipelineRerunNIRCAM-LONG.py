@@ -328,6 +328,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
                     realigned_vvv_filename)
         log.info(f"Realigned to VVV filename: {realigned_vvv_filename}")
+        raoffset = 0
+        decoffset = 0
         realigned = realign_to_vvv(filtername=filtername.lower(),
                                    fov_regname=fov_regname[regionname],
                                    basepath=basepath, module=module,
