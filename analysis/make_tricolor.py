@@ -67,6 +67,30 @@ def three_filter_tricolor(filternames, target, module, basepath):
         f'{basepath}/images/{filternames[1][:-1].upper()}_reproj_{module}-fortricolor.fits',
         f'{basepath}/images/{filternames[2][:-1].upper()}_reproj_{module}-fortricolor.fits',
             ]
+    rgb_withstars = np.array(
+        [
+            fits.getdata(rgb[0]),
+            fits.getdata(rgb[1]),
+            fits.getdata(rgb[2]),
+        ]
+    ).swapaxes(0,2).swapaxes(0,1)
+
+    AVM = pyavm.AVM.from_header(fits.getheader(rgb[0]))
+
+    rgb_scaled = np.array([
+                           simple_norm(rgb_withstars[:,:,0], stretch='asinh', min_cut=-1, max_cut=90)(rgb_withstars[:,:,0]),
+                           simple_norm(rgb_withstars[:,:,1], stretch='asinh', min_cut=-1, max_cut=210)(rgb_withstars[:,:,1]),
+                           simple_norm(rgb_withstars[:,:,2], stretch='asinh', min_cut=-1, max_cut=120)(rgb_withstars[:,:,2]),
+    ]).swapaxes(0,2).swapaxes(0,1)
+
+    plt.figure(figsize=(24,10))
+    plt.imshow(rgb_scaled, origin='lower')
+    plt.xticks([]);
+    plt.yticks([]);
+
+    outfn = f"{basepath}/images/{target}JWST_{module}_R-{filternames[0]}_G-{filternames[1]}_B-{filternames[2]}_rotated.png"
+    save_rgb(rgb_scaled.swapaxes(0,1), outfn, flip=1)
+    AVM.embed(outfn, outfn)
     
 
 # Run reproj_fortricolor first to have the files available
@@ -112,17 +136,31 @@ def main():
     #filternames = ['F466N', 'F187N']
     #two_filter_tricolor(filternames, target, module, basepath)
     
-    filternames = ['F410M', 'F405N']
-    two_filter_tricolor(filternames, target, module, basepath)
+    #filternames = ['F410M', 'F405N']
+    #two_filter_tricolor(filternames, target, module, basepath)
+    #
+    #filternames = ['F466N', 'F410M']
+    #two_filter_tricolor(filternames, target, module, basepath)
+    #
+    #filternames = ['F182M', 'F187N']
+    #two_filter_tricolor(filternames, target, module, basepath)
+    #
+    #filternames = ['F212N', 'F182M']
+    #two_filter_tricolor(filternames, target, module, basepath)
     
-    filternames = ['F466N', 'F410M']
-    two_filter_tricolor(filternames, target, module, basepath)
+    #
+    filternames = ['F466N', 'F405N', 'F187N']
+    three_filter_tricolor(filternames, target, module, basepath)
     
-    filternames = ['F182M', 'F187N']
-    two_filter_tricolor(filternames, target, module, basepath)
+    filternames = ['F466N', 'F405N', 'F212N']
+    three_filter_tricolor(filternames, target, module, basepath)
+        
+    #
+    filternames = ['F405N', 'F212N', 'F187N']
+    three_filter_tricolor(filternames, target, module, basepath)
     
-    filternames = ['F212N', 'F182M']
-    two_filter_tricolor(filternames, target, module, basepath)
+    filternames = ['F466N', 'F212N', 'F187N']
+    three_filter_tricolor(filternames, target, module, basepath)
 
 
     '''from optparse import OptionParser
