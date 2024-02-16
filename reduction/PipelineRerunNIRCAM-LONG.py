@@ -337,9 +337,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                    imfile=realigned_vvv_filename,
                                    ksmag_limit=15 if filtername.lower() == 'f410m' else 11,
                                    mag_limit=18 if filtername.lower() == 'f115w' else 15,
-                                   max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
-                                   raoffset=raoffset,
-                                   decoffset=decoffset)
+                                   max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec
+                                   )
         log.info(f"Done realigning to VVV (module={module}, filtername={filtername})")
 
         log.info(f"Realigning to refcat (module={module}, filtername={filtername})")
@@ -353,8 +352,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                        fieldnumber=field,
                                        mag_limit=20, proposal_id=proposal_id,
                                        max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
-                                       imfile=realigned_refcat_filename,
-                                       raoffset=raoffset, decoffset=decoffset)
+                                       imfile=realigned_refcat_filename
+                                       )
         log.info(f"Done realigning to refcat (module={module}, filtername={filtername})")
 
         log.info(f"Removing saturated stars.  cwd={os.getcwd()}")
@@ -468,8 +467,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                    imfile=realigned_vvv_filename,
                                    max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
                                    ksmag_limit=15 if filtername.lower() == 'f410m' else 11,
-                                   mag_limit=18 if filtername.lower() == 'f115w' else 15,
-                                   raoffset=raoffset, decoffset=decoffset)
+                                   mag_limit=18 if filtername.lower() == 'f115w' else 15
+                                   )
 
         log.info(f"Realigning to refcat (module={module}) with raoffset={raoffset}, decoffset={decoffset}")
         realigned_refcat_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-refcat.fits'
@@ -483,8 +482,8 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                        max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
                                        mag_limit=20,
                                        proposal_id=proposal_id,
-                                       imfile=realigned_refcat_filename,
-                                       raoffset=raoffset, decoffset=decoffset)
+                                       imfile=realigned_refcat_filename
+                                      )
 
         log.info(f"Removing saturated stars.  cwd={os.getcwd()}")
         try:
