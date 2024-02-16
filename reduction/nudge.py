@@ -1,25 +1,39 @@
 
 import numpy as np
+from astropy import units as u
 from jwst import datamodels
 from jwst.stpipe import Step
 from jwst.tweakreg.utils import adjust_wcs
 
 
-class NudgeGWCSStep(Step):
+class NudgeStep(Step):
     """
-    NudgeGWCSStep: 
+    NudgeGWCSStep: Adjust the WCS of an image by a given x and y offset
     """
     
-    
-    spec = """
-        deltara = 
-        deltadec = 
+    spec = f"""
+        xoffset = float(default=0.0), # X offset in arcsec
+        yoffset = float(default=0.0) # Y offset in arcsec
     """
 
     class_alias = "nudge"
     
     def process(self, input_data):
+        with datamodels.open(input_data) as im:
+            align_fits = im.copy()
+        
+        self.nudge_wcs(align_fits)
 
+        return align_fits
+
+    def nudge_wcs(self, im):
+        xshift = self.xoffset * u.arcsec
+        yshift = self.yoffset * u.arcsec
+
+        ww = adjust_wcs(im.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+        im.meta.wcs = ww
+        im.set_fits_wcs(WCS(ww.to_fits()[0]))
+        return im
         
 '''
     def process(self, input_data):

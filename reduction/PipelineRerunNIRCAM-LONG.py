@@ -68,19 +68,6 @@ print(jwst.__version__)
 medfilt_size = {'F410M': 15, 'F405N': 256, 'F466N': 55,
                 'F182M': 55, 'F187N': 512, 'F212N': 512}
 
-# For fixing bulk offset after stage 3 of the pipeline. 
-# Now no longer being used, only use commented out version if bulk offset returns.
-#pix_coords = {'2221':
-#              {'002':
-#               {
-#                   'star_coord': SkyCoord(266.594893*u.deg, -28.587417*u.deg),
-#                   'nrca': (3904, 869),
-#                   'nrcb': (1119, 832),
-#                   'merged': (3903, 868)
-#               }
-#              }
-#             }
-
 basepath = '/orange/adamginsburg/jwst/brick/'
 
 def main(filtername, module, Observations=None, regionname='brick', do_destreak=True,
@@ -208,7 +195,6 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         tweakreg_parameters = tweakreg_asdf.tree['parameters']
         log.info(f'Filter {filtername} tweakreg parameters: {tweakreg_parameters}')
 
-
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
 
@@ -259,42 +245,40 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     member['expname'] = outname
 
             if field == '002' and proposal_id == '2221':
-                    if do_destreak:
-                        align_image = member['expname'].replace("_destreak.fits", "_align.fits")
-                    else: 
-                        align_image = member['expname'].replace("_cal.fits", "_align.fits")
-                    shutil.copy(member['expname'], align_image)
-                    offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
-                    row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                    log.info(f'Running manual align on {align_image}')
-                    try:
-                        xshift = float(row['xshift (arcsec)'])*u.arcsec
-                        yshift = float(row['yshift (arcsec)'])*u.arcsec + 0.8*u.arcsec
-                    except:
-                        log.info('Something went wrong with manual align, running default values.')
-                        visit = member['expname'].split('_')[0][-3:]
-                        if visit == '001':
-                            xshift = 7.95*u.arcsec
-                            yshift = 0.6*u.arcsec
-                        elif visit == '002':
-                            xshift = 3.85*u.arcsec
-                            yshift = 1.57*u.arcsec
-                        else:
-                            xshift = 0*u.arcsec
-                            yshift = 0*u.arcsec
-                    if filtername.upper() in ('F212N', 'F187N', 'F182M'):
-                        print('Short wavelength correction.')
-                        if 'nrca' in align_image.lower():
-                            xshift += 0.1*u.arcsec
-                            yshift += -0.23*u.arcsec
-                    align_fits = ImageModel(align_image)
-                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
-                    align_fits.meta.wcs = ww
-                    align_fits.save(align_image)
-                    align_fits = fits.open(align_image)
-                    align_fits[1].header.update(ww.to_fits()[0])
-                    align_fits.writeto(align_image, overwrite=True)
-                    member['expname'] = align_image
+                if do_destreak:
+                    align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                else: 
+                    align_image = member['expname'].replace("_cal.fits", "_align.fits")
+                shutil.copy(member['expname'], align_image)
+                offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
+                row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
+                log.info(f'Running manual align on {align_image}')
+                try:
+                    xshift = float(row['xshift (arcsec)'])*u.arcsec
+                    yshift = float(row['yshift (arcsec)'])*u.arcsec + 0.8*u.arcsec
+                except:
+                    log.info('Something went wrong with manual align, running default values.')
+                    visit = member['expname'].split('_')[0][-3:]
+                    if visit == '001':
+                        xshift = 7.95*u.arcsec
+                        yshift = 0.6*u.arcsec
+                    elif visit == '002':
+                        xshift = 3.85*u.arcsec
+                        yshift = 1.57*u.arcsec
+                    else:
+                        xshift = 0*u.arcsec
+                        yshift = 0*u.arcsec
+                if filtername.upper() in ('F212N', 'F187N', 'F182M'):
+                    print('Short wavelength correction.')
+                    if 'nrca' in align_image.lower():
+                        xshift += 0.1*u.arcsec
+                        yshift += -0.23*u.arcsec
+                align_fits = ImageModel(align_image)
+                ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                align_fits.meta.wcs = ww
+                align_fits.set_fits_wcs(WCS(ww.to_fits()[0]))
+                align_fits.save(align_image)
+                member['expname'] = align_image
 
             elif field == '004' and proposal_id == '1182':
                 align_image = member['expname']
@@ -493,42 +477,41 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                     member['expname'] = outname
 
             if field == '002' and proposal_id == '2221':
-                    if do_destreak:
-                        align_image = member['expname'].replace("_destreak.fits", "_align.fits")
-                    else: 
-                        align_image = member['expname'].replace("_cal.fits", "_align.fits")
-                    shutil.copy(member['expname'], align_image)
-                    offsets_tbl = Table.read('/orange/adamginsburg/jwst/cloudc/offsets/Offsets_JWST_Cloud_C.csv')
-                    row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
-                    log.info(f'Running manual align on {align_image}')
-                    try:
-                        xshift = float(row['xshift (arcsec)'])*u.arcsec
-                        yshift = float(row['yshift (arcsec)'])*u.arcsec + 0.8*u.arcsec
-                    except:
-                        log.info('Something went wrong with manual align, running default values.')
-                        visit = member['expname'].split('_')[0][-3:]
-                        if visit == '001':
-                            xshift = 7.95*u.arcsec
-                            yshift = 0.6*u.arcsec
-                        elif visit == '002':
-                            xshift = 3.85*u.arcsec
-                            yshift = 1.57*u.arcsec
-                        else:
-                            xshift = 0*u.arcsec
-                            yshift = 0*u.arcsec
-                    if filtername.upper() in ('F212N', 'F187N', 'F182M'):
-                        print('Short wavelength correction.')
-                        if 'nrca' in align_image.lower():
-                            xshift += 0.1*u.arcsec
-                            yshift += -0.23*u.arcsec
-                    align_fits = ImageModel(align_image)
-                    ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
-                    align_fits.meta.wcs = ww
-                    align_fits.save(align_image)
-                    align_fits = fits.open(align_image)
-                    align_fits[1].header.update(ww.to_fits()[0])
-                    align_fits.writeto(align_image, overwrite=True)
-                    member['expname'] = align_image
+                if do_destreak:
+                    align_image = member['expname'].replace("_destreak.fits", "_align.fits")
+                else: 
+                    align_image = member['expname'].replace("_cal.fits", "_align.fits")
+                shutil.copy(member['expname'], align_image)
+                offsets_tbl = Table.read(f'{basepath}/offsets/Offsets_JWST_Cloud_C.csv')
+                row = offsets_tbl[member['expname'].split('/')[-1] == offsets_tbl['Filename_1']]
+                log.info(f'Running manual align on {align_image}')
+                try:
+                    xshift = float(row['xshift (arcsec)'])*u.arcsec
+                    yshift = float(row['yshift (arcsec)'])*u.arcsec + 0.8*u.arcsec
+                except:
+                    log.info('Something went wrong with manual align, running default values.')
+                    visit = member['expname'].split('_')[0][-3:]
+                    if visit == '001':
+                        xshift = 7.95*u.arcsec
+                        yshift = 0.6*u.arcsec
+                    elif visit == '002':
+                        xshift = 3.85*u.arcsec
+                        yshift = 1.57*u.arcsec
+                    else:
+                        xshift = 0*u.arcsec
+                        yshift = 0*u.arcsec
+                if filtername.upper() in ('F212N', 'F187N', 'F182M'):
+                    print('Short wavelength correction.')
+                    if 'nrca' in align_image.lower():
+                        xshift += 0.1*u.arcsec
+                        yshift += -0.23*u.arcsec
+                align_fits = ImageModel(align_image)
+                ww = adjust_wcs(align_fits.meta.wcs, delta_ra = yshift, delta_dec = xshift)
+                align_fits.meta.wcs = ww
+                align_fits.set_fits_wcs(WCS(ww.to_fits()[0]))
+                align_fits.save(align_image)
+                member['expname'] = align_image
+
             elif field == '004' and proposal_id == '1182':
                 # I don't think this gets run.
                 align_image = member['expname']
@@ -684,6 +667,97 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
 
     globals().update(locals())
     return locals()
+
+def fix_alignment(fn, proposal_id, module, field, basepath, filtername):
+    if os.path.exists(fn):
+        print(f"Running manual align for {module} data ({proposal_id} + {field}): {fn}")
+    else:
+        print(f"Skipping manual align for nonexistent file {module} ({proposal_id} + {field}): {fn}")
+        return
+    if (field == '004' and proposal_id == '1182') or (field == '001' and proposal_id == '2221'):
+        offsets_tbl = Table.read(f'{basepath}/offsets/Offsets_JWST_Brick{proposal_id}.csv')
+        exposure = int(fn.split("_")[-3])
+        thismodule = fn.split("_")[-2]
+        visit = fn.split("_")[0]
+        match = ((offsets_tbl['Visit'] == visit) &
+                (offsets_tbl['Exposure'] == exposure) &
+                ((offsets_tbl['Module'] == thismodule) | (offsets_tbl['Module'] == thismodule.strip('1234'))) &
+                (offsets_tbl['Filter'] == filtername)
+                )
+        if match.sum() != 1:
+            raise ValueError(f"too many or too few matches for {fn} (match.sum() = {match.sum()}).  exposure={exposure}, thismodule={thismodule}, filtername={filtername}")
+        row = offsets_tbl[match]
+        print(f'Running manual align for merged for {row["Group"][0]} {row["Module"][0]} {row["Exposure"][0]}.')
+        rashift = float(row['dra (arcsec)'][0])*u.arcsec
+        decshift = float(row['ddec (arcsec)'][0])*u.arcsec
+    elif (field == '002' and proposal_id == '2221'):
+        visit = fn.split('_')[0][-3:]
+        if visit == '001':
+            decshift = 7.95*u.arcsec
+            rashift = 0.6*u.arcsec
+        elif visit == '002':
+            decshift = 3.85*u.arcsec
+            rashift = 1.57*u.arcsec
+        else:
+            decshift = 0*u.arcsec
+            rashift = 0*u.arcsec
+        if filtername.upper() in ('F212N', 'F187N', 'F182M'):
+            print('Short wavelength offset correction.')
+            if 'nrca' in align_image.lower():
+                decshift += 0.1*u.arcsec
+                rashift += -0.23*u.arcsec
+    print(f"Shift for {fn} is {rashift}, {decshift}")
+    align_fits = fits.open(fn)
+    if 'RAOFFSET' in align_fits[1].header:
+        # don't shift twice if we re-run
+        print(f"{fn} is already aligned ({align_fits[1].header['RAOFFSET']}, {align_fits[1].header['DEOFFSET']})")
+    else:
+        # ASDF header
+        fa = ImageModel(fn)
+        wcsobj = fa.meta.wcs
+        print(f"Before shift, crval={wcsobj.to_fits()[0]['CRVAL1']}, {wcsobj.to_fits()[0]['CRVAL2']}, {wcsobj.forward_transform.param_sets[-1]}")
+        wcsobj.meta.oldwcs = copy.copy(wcsobj)
+        ww = adjust_wcs(wcsobj, delta_ra=rashift, delta_dec=decshift)
+        print(f"After shift, crval={ww.to_fits()[0]['CRVAL1']}, {ww.to_fits()[0]['CRVAL2']}, {wcsobj.forward_transform.param_sets[-1]}")
+        fa.meta.wcs = ww
+        fa.save(fn, overwrite=True)
+
+        # FITS header
+        align_fits = fits.open(fn)
+        align_fits[1].header['OLCRVAL1'] = align_fits[1].header['CRVAL1']
+        align_fits[1].header['OLCRVAL2'] = align_fits[1].header['CRVAL2']
+        align_fits[1].header.update(ww.to_fits()[0])
+        align_fits[1].header['RAOFFSET'] = rashift.value
+        align_fits[1].header['DEOFFSET'] = decshift.value
+        align_fits.writeto(fn, overwrite=True)
+        assert 'RAOFFSET' in fits.getheader(fn, ext=1)
+    check_wcs(fn)
+
+
+def check_wcs(fn):
+    print(f"Checking WCS of {fn}")
+    fa = ImageModel(fn)
+    wcsobj = fa.meta.wcs
+    print(f"fa['meta']['wcs'] crval={wcsobj.to_fits()[0]['CRVAL1']}, {wcsobj.to_fits()[0]['CRVAL2']}, {wcsobj.forward_transform.param_sets[-1]}")
+    new_1024 = wcsobj.pixel_to_world(1024, 1024)
+    print(f"pixel_to_world(1024,1024) = {new_1024}")
+    if 'oldwcs' in fa.meta:
+        oldwcsobj = fa.meta.oldwcs
+        print(f"fa['meta']['oldwcs'] crval={oldwcsobj.to_fits()[0]['CRVAL1']}, {oldwcsobj.to_fits()[0]['CRVAL2']}, {oldwcsobj.forward_transform.param_sets[-1]}")
+        old_1024 = oldwcsobj.pixel_to_world(1024, 1024)
+        print(f"pixel_to_world(1024,1024) = {old_1024}, sep={old_1024.separation(new_1024)}")
+
+
+    # FITS header
+    fh = fits.open(fn)
+    print(f"CRVAL1={fh[1].header['CRVAL1']}, CRVAL2={fh[1].header['CRVAL2']}")
+    if 'OLCRVAL1' in fh[1].header:
+        print(f"OLCRVAL1={fh[1].header['OLCRVAL1']}, OLCRVAL2={fh[1].header['OLCRVAL2']}")
+    if 'RAOFFSET' in fh[1].header:
+        print("RA, DE offset: ", fh[1].header['RAOFFSET'], fh[1].header['DEOFFSET'])
+    ww = WCS(fh[1].header)
+    fits_1024 = ww.pixel_to_world(1024, 1024)
+    print(f"pixel_to_world(1024,1024) = {fits_1024}, sep={fits_1024.separation(new_1024)}")
 
 if __name__ == "__main__":
     from optparse import OptionParser
