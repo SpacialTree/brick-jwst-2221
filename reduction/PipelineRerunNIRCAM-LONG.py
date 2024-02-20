@@ -3,6 +3,7 @@ from glob import glob
 from astroquery.mast import Mast, Observations
 import copy
 import os
+import re
 import shutil
 import numpy as np
 import json
@@ -49,6 +50,8 @@ from saturated_star_finding import iteratively_remove_saturated_stars, remove_sa
 import crds
 import jwst
 
+filter_regex = re.compile('f[0-9][0-9][0-9][nmw]')
+
 import warnings
 from astropy.utils.exceptions import AstropyWarning, AstropyDeprecationWarning
 from astropy.wcs import FITSFixedWarning
@@ -59,6 +62,7 @@ warnings.simplefilter('ignore', category=FITSFixedWarning)
 def print(*args, **kwargs):
     now = datetime.datetime.now().isoformat()
     from builtins import print as printfunc
+    # redundant log.info(f"{now}: {' '.join(map(str, args))}",)
     return printfunc(f"{now}:", *args, **kwargs)
 
 
@@ -69,8 +73,22 @@ medfilt_size = {'F410M': 15, 'F405N': 256, 'F466N': 55,
                 'F182M': 55, 'F187N': 512, 'F212N': 512}
 
 fov_regname = {'brick': 'regions_/nircam_brick_fov.reg',
-                'cloudc': 'regions_/nircam_cloudc_fov.reg',
-                }
+               'cloudc': 'regions_/nircam_cloudc_fov.reg',
+               }
+
+# it's very difficult to modify the Webb pipeline in this way
+# # replace Image2Pipeline's 'resample' with one that uses our hand-corrected coordinates
+# def pre_resample(func):
+#   def wrapper(self, input, *args, **kwargs):
+#     print("Before resample is called, fixing coordinates")
+#     for member in inputs:
+#         print(f"Fixing alignment for {member.meta.filename}")
+#         fix_alignment(member.meta.filename)
+#     result = func(*args, **kwargs)
+#     return result
+#   return wrapper
+# 
+# Image2Pipeline.step_defs['resample'] = pre_resample(Image2Pipeline.resample)
 
 def main(filtername, module, Observations=None, regionname='brick', do_destreak=True,
          field='001', proposal_id='2221', skip_step1and2=False):
@@ -79,7 +97,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
     can save time if you just want to redo the tweakreg steps but already have
     the zero-frame stuff done.
     """
-    log.info(f"Processing filter {filtername} module {module} with do_destreak={do_destreak} and skip_step1and2={skip_step1and2} for field {field} and proposal id {proposal_id} in region {regionname}")
+    print(f"Processing filter {filtername} module {module} with do_destreak={do_destreak} and skip_step1and2={skip_step1and2} for field {field} and proposal id {proposal_id} in region {regionname}")
 
     wavelength = int(filtername[1:4])
 
@@ -176,31 +194,55 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
 
     # all cases, except if you're just doing a merger?
     if module in ('nrca', 'nrcb', 'merged'):
-        log.info(f"Working on module {module}: running initial pipeline setup steps (skip_step1and2={skip_step1and2})")
-        log.info(f"Searching for {os.path.join(output_dir, f'jw0{proposal_id}-o{field}*_image3_*0[0-9][0-9]_asn.json')}")
+        print(f"Working on module {module}: running initial pipeline setup steps (skip_step1and2={skip_step1and2})")
+        print(f"Searching for {os.path.join(output_dir, f'jw0{proposal_id}-o{field}*_image3_*0[0-9][0-9]_asn.json')}")
         asn_file_search = glob(os.path.join(output_dir, f'jw0{proposal_id}-o{field}*_image3_*0[0-9][0-9]_asn.json'))
         if len(asn_file_search) == 1:
             asn_file = asn_file_search[0]
         elif len(asn_file_search) > 1:
             asn_file = sorted(asn_file_search)[-1]
-            log.info(f"Found multiple asn files: {asn_file_search}.  Using the more recent one, {asn_file}.")
+            print(f"Found multiple asn files: {asn_file_search}.  Using the more recent one, {asn_file}.")
         else:
             raise ValueError(f"Mismatch: Did not find any asn files for module {module} for field {field} in {output_dir}")
 
         mapping = crds.rmap.load_mapping(f'/orange/adamginsburg/jwst/{regionname}/crds/mappings/jwst/jwst_nircam_pars-tweakregstep_0003.rmap')
-        log.info(f"Mapping: {mapping.todict()['selections']}")
-        log.info(f"Filtername: {filtername}")
+        print(f"Mapping: {mapping.todict()['selections']}")
+        print(f"Filtername: {filtername}")
         filter_match = [x for x in mapping.todict()['selections'] if filtername in x]
-        log.info(f"Filter_match: {filter_match} n={len(filter_match)}")
+        print(f"Filter_match: {filter_match} n={len(filter_match)}")
         tweakreg_asdf_filename = filter_match[0][4]
         tweakreg_asdf = asdf.open(f'https://jwst-crds.stsci.edu/unchecked_get/references/jwst/{tweakreg_asdf_filename}')
         tweakreg_parameters = tweakreg_asdf.tree['parameters']
-        log.info(f'Filter {filtername} tweakreg parameters: {tweakreg_parameters}')
+        tweakreg_parameters.update({'fitgeometry': 'general',
+                                    # brightest = 5000 was causing problems- maybe the cross-alignment was getting caught on PSF artifacts?
+                                    'brightest': 5000,
+                                    'snr_threshold': 30, # was 5, but that produced too many stars
+                                    # define later 'abs_refcat': abs_refcat,
+                                    'save_catalogs': True,
+                                    'catalog_format': 'fits',
+                                    'kernel_fwhm': fwhm_pix,
+                                    'nclip': 5,
+                                    # expand_refcat: A boolean indicating whether or not to expand reference catalog with new sources from other input images that have been already aligned to the reference image. (Default=False)
+                                    'expand_refcat': True,
+                                    # based on DebugReproduceTweakregStep
+                                    'sharplo': 0.3,
+                                    'sharphi': 0.9,
+                                    'roundlo': -0.25,
+                                    'roundhi': 0.25,
+                                    'separation': 0.5, # minimum separation; default is 1
+                                    'tolerance': 0.1, # tolerance: Matching tolerance for xyxymatch in arcsec. (Default=0.7)
+                                    'save_results': True,
+                                    # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
+                                    })
+
+        
+
+        print(f'Filter {filtername} tweakreg parameters: {tweakreg_parameters}')
 
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
 
-        log.info(f"In cwd={os.getcwd()}")
+        print(f"In cwd={os.getcwd()}")
         if not skip_step1and2:
             # re-calibrate all uncal files -> cal files *without* suppressing first group
             for member in asn_data['products'][0]['members']:
@@ -208,13 +250,21 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                 assert f'jw0{proposal_id}{field}' in member['expname']
                 print(f"DETECTOR PIPELINE on {member['expname']}")
                 print("Detector1Pipeline step")
-            # from Hosek: expand_large_events -> false; turn off "snowball" detection
+                # from Hosek: expand_large_events -> false; turn off "snowball" detection
                 Detector1Pipeline.call(member['expname'].replace("_cal.fits",
                                                                  "_uncal.fits"),
                                        save_results=True, output_dir=output_dir,
                                        save_calibrated_ramp=True,
                                        steps={'ramp_fit': {'suppress_one_group':False},
                                               "refpix": {"use_side_ref_pixels": True}})
+
+                # apparently "rate" files have no WCS, but this is where it's needed...
+                # print("Aligning RATE images before doing IMAGE2 pipeline")
+                # for member in asn_data['products'][0]['members']:
+                #     align_image = member['expname'].replace("_cal.fits", "_rate.fits")
+                #     fix_alignment(align_image, proposal_id=proposal_id, module=module, field=field, basepath=basepath, filtername=filtername)
+                #else:
+                #    print(f"Field {field} proposal {proposal_id} did not require re-alignment")
                 print(f"IMAGE2 PIPELINE on {member['expname']}")
                 Image2Pipeline.call(member['expname'].replace("_cal.fits",
                                                               "_rate.fits"),
@@ -223,21 +273,22 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         else:
             print("Skipped step 1 and step2")
 
-        print("Doing pre-alignment from offsets tables")
-        for member in asn_data['products'][0]['members']:
-            if (field == '004' and proposal_id == '1182') or ((field == '001' or field  == '002') and proposal_id == '2221'):
-                for suffix in ("_cal.fits", "_destreak.fits"):
-                    align_image = member['expname'].replace("_cal.fits", suffix)
-                    fix_alignment(align_image, proposal_id=proposal_id, module=module, field=field, basepath=basepath, filtername=filtername)
-            else:
-                print(f"Field {field} proposal {proposal_id} did not require re-alignment")
+        # don't need to do this / it affects Savannah's fixing approach
+        #print("Doing pre-alignment from offsets tables")
+        #for member in asn_data['products'][0]['members']:
+        #    if (field == '004' and proposal_id == '1182') or ((field == '001' or field  == '002') and proposal_id == '2221'):
+        #        for suffix in ("_cal.fits", "_destreak.fits"):
+        #            align_image = member['expname'].replace("_cal.fits", suffix)
+        #            fix_alignment(align_image, proposal_id=proposal_id, module=module, field=field, basepath=basepath, filtername=filtername)
+        #    else:
+        #        print(f"Field {field} proposal {proposal_id} did not require re-alignment")
 
 
     else:
         raise ValueError(f"Module is {module} - not allowed!")
 
     if module in ('nrca', 'nrcb'):
-        log.info(f"Filter {filtername} module {module}: doing tweakreg.  do_destreak={do_destreak}")
+        print(f"Filter {filtername} module {module}: doing tweakreg.  do_destreak={do_destreak}")
 
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
@@ -261,20 +312,23 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         with open(asn_file_each, 'w') as fh:
             json.dump(asn_data, fh)
 
-        if filtername.lower() == 'f405n':
-        # for the VVV cat, use the merged version: no need for independent versions
+        # don't use VVV at all; the catalog does not play nicely with JWST pipe catalogs
+        if False: #filtername.lower() == 'f405n':
+            # for the VVV cat, use the merged version: no need for independent versions
             abs_refcat = vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername}-merged_vvvcat.ecsv')
             print(f"Loaded VVV catalog {vvvdr2fn}")
             retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module='merged', fieldnumber=field)
             tweakreg_parameters['abs_refcat'] = vvvdr2fn
             tweakreg_parameters['abs_searchrad'] = 1
             reftbl = Table.read(abs_refcat)
+            reftbl.meta['name'] = f'VVV Reference Catalog {filtername}'
             assert 'skycoord' in reftbl.colnames
         else:
             abs_refcat = f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv'
             reftbl = Table.read(abs_refcat)
             # For non-F410M, try aligning to F410M instead of VVV?
             reftblversion = reftbl.meta['VERSION']
+            reftbl.meta['name'] = 'F405N Reference Astrometric Catalog'
 
             # truncate to top 10,000 sources
             reftbl[:10000].write(f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog_truncated10000.ecsv', overwrite=True)
@@ -287,26 +341,9 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             tweakreg_parameters['searchrad'] = 0.5
             print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
 
-        tweakreg_parameters.update({'fitgeometry': 'general',
-                                    # brightest = 5000 was causing problems- maybe the cross-alignment was getting caught on PSF artifacts?
-                                    'brightest': 500,
-                                    'snr_threshold': 30, # was 5, but that produced too many stars
-                                    'abs_refcat': abs_refcat,
-                                    'save_catalogs': True,
-                                    'catalog_format': 'fits',
-                                    'kernel_fwhm': fwhm_pix,
-                                    'nclip': 5,
-                                    # based on DebugReproduceTweakregStep
-                                    'sharplo': 0.3,
-                                    'sharphi': 0.9,
-                                    'roundlo': -0.25,
-                                    'roundhi': 0.25,
-                                    'separation': 0.5, # minimum separation; default is 1
-                                    'save_results': True,
-                                    # 'clip_accum': True, # https://github.com/spacetelescope/tweakwcs/pull/169/files
-                                    })
+        tweakreg_parameters.update({'abs_refcat': abs_refcat,}
 
-        log.info(f"Running tweakreg ({module})")
+        print(f"Running tweakreg ({module})")
         calwebb_image3.Image3Pipeline.call(
             asn_file_each,
             steps={'tweakreg': tweakreg_parameters,
@@ -321,15 +358,14 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         print("After tweakreg step, checking WCS headers:")
         for member in asn_data['products'][0]['members']:
             check_wcs(member['expname'])
+            check_wcs(member['expname'].replace('destreak', 'i2d'))
         check_wcs(asn_data['products'][0]['name'] + "_i2d.fits")
 
-        log.info(f"Realigning to VVV (module={module}, filter={filtername})")
+        print(f"Realigning to VVV (module={module}, filter={filtername})")
         realigned_vvv_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-vvv.fits'
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
                     realigned_vvv_filename)
-        log.info(f"Realigned to VVV filename: {realigned_vvv_filename}")
-        raoffset = 0
-        decoffset = 0
+        print(f"Realigned to VVV filename: {realigned_vvv_filename}")
         realigned = realign_to_vvv(filtername=filtername.lower(),
                                    fov_regname=fov_regname[regionname],
                                    basepath=basepath, module=module,
@@ -337,26 +373,29 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                    imfile=realigned_vvv_filename,
                                    ksmag_limit=15 if filtername.lower() == 'f410m' else 11,
                                    mag_limit=18 if filtername.lower() == 'f115w' else 15,
-                                   max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec
+                                   max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
+                                   #raoffset=raoffset,
+                                   #decoffset=decoffset
                                    )
-        log.info(f"Done realigning to VVV (module={module}, filtername={filtername})")
+        print(f"Done realigning to VVV (module={module}, filtername={filtername})")
 
-        log.info(f"Realigning to refcat (module={module}, filtername={filtername})")
+        print(f"Realigning to refcat (module={module}, filtername={filtername})")
         realigned_refcat_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-refcat.fits'
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
                     realigned_refcat_filename)
-        log.info(f"Realigned refcat filename: {realigned_refcat_filename}")
+        print(f"Realigned refcat filename: {realigned_refcat_filename}")
         realigned = realign_to_catalog(reftbl['skycoord'],
                                        filtername=filtername.lower(),
                                        basepath=basepath, module=module,
                                        fieldnumber=field,
                                        mag_limit=20, proposal_id=proposal_id,
                                        max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
-                                       imfile=realigned_refcat_filename
+                                       imfile=realigned_refcat_filename,
+                                       #raoffset=raoffset, decoffset=decoffset
                                        )
-        log.info(f"Done realigning to refcat (module={module}, filtername={filtername})")
+        print(f"Done realigning to refcat (module={module}, filtername={filtername})")
 
-        log.info(f"Removing saturated stars.  cwd={os.getcwd()}")
+        print(f"Removing saturated stars.  cwd={os.getcwd()}")
         try:
             remove_saturated_stars(f'jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits')
             remove_saturated_stars(f'jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-vvv.fits')
@@ -380,14 +419,14 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
 
     if module == 'merged':
         # try merging all frames & modules
-        log.info(f"Working on merged reduction (both modules):  asn_file={asn_file}")
+        print(f"Working on merged reduction (both modules):  asn_file={asn_file}")
 
         # Load asn_data for both modules
         with open(asn_file) as f_obj:
             asn_data = json.load(f_obj)
 
         for member in asn_data['products'][0]['members']:
-            log.info(f"Running destreak={do_destreak} and maybe alignment on {member} for module={module}")
+            print(f"Running destreak={do_destreak} and maybe alignment on {member} for module={module}")
             hdr = fits.getheader(member['expname'])
             if do_destreak:
                 if filtername in (hdr['PUPIL'], hdr['FILTER']):
@@ -403,7 +442,10 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         with open(asn_file_merged, 'w') as fh:
             json.dump(asn_data, fh)
 
-        if filtername.lower() == 'f405n':
+        # don't re-fit to VVV - it's not accurate enough with the JWST-derived
+        # catalogs.  We needed to use our own much more extensive cataloging to
+        # beat down the noise enough to make this approach viable
+        if False: # filtername.lower() == 'f405n':
             vvvdr2fn = (f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername}-{module}_vvvcat.ecsv')
             print(f"Loaded VVV catalog {vvvdr2fn}")
             retrieve_vvv(basepath=basepath, filtername=filtername, fov_regname=fov_regname[regionname], module=module, fieldnumber=field)
@@ -425,39 +467,25 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             tweakreg_parameters['searchrad'] = 0.5
             print(f"Reference catalog is {abs_refcat} with version {reftblversion}")
 
+        tweakreg_parameters.update({'abs_refcat': abs_refcat,}
 
-        tweakreg_parameters.update({'fitgeometry': 'general',
-                                    'brightest': 500,
-                                    'snr_threshold': 30,
-                                    'abs_refcat': abs_refcat,
-                                    'save_catalogs': True,
-                                    'catalog_format': 'fits',
-                                    'kernel_fwhm': fwhm_pix,
-                                    'nclip': 5,
-                                    'sharplo': 0.3,
-                                    'sharphi': 0.9,
-                                    'roundlo': -0.25,
-                                    'roundhi': 0.25,
-                                    'separation': 0.5, # minimum separation; default is 1
-                                    'save_results': True,
-                                    })
-
-        log.info("Running tweakreg (merged)")
+        print("Running Image3Pipeline with tweakreg (merged)")
         calwebb_image3.Image3Pipeline.call(
             asn_file_merged,
             steps={'tweakreg': tweakreg_parameters,},
+            #steps={'tweakreg': False,}
             output_dir=output_dir,
             save_results=True)
-        log.info(f"DONE running {asn_file_merged}.  This should have produced file {asn_data['products'][0]['name']}_i2d.fits")
+        print(f"DONE running Image3Pipeline {asn_file_merged}.  This should have produced file {asn_data['products'][0]['name']}_i2d.fits")
 
         print("After tweakreg step, checking WCS headers:")
         for member in asn_data['products'][0]['members']:
             check_wcs(member['expname'])
         check_wcs(asn_data['products'][0]['name'] + "_i2d.fits")
 
-        log.info(f"Realigning to VVV (module={module}) with raoffset={raoffset}, decoffset={decoffset}")
+        print(f"Realigning to VVV (module={module})")# with raoffset={raoffset}, decoffset={decoffset}")
         realigned_vvv_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-vvv.fits'
-        log.info(f"Realigned to VVV filename: {realigned_vvv_filename}")
+        print(f"Realigned to VVV filename: {realigned_vvv_filename}")
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
                     realigned_vvv_filename)
         realigned = realign_to_vvv(filtername=filtername.lower(),
@@ -466,12 +494,13 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                    imfile=realigned_vvv_filename,
                                    max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
                                    ksmag_limit=15 if filtername.lower() == 'f410m' else 11,
-                                   mag_limit=18 if filtername.lower() == 'f115w' else 15
+                                   mag_limit=18 if filtername.lower() == 'f115w' else 15,
+                                   #raoffset=raoffset, decoffset=decoffset
                                    )
 
-        log.info(f"Realigning to refcat (module={module}) with raoffset={raoffset}, decoffset={decoffset}")
+        print(f"Realigning to refcat (module={module})")# with raoffset={raoffset}, decoffset={decoffset}")
         realigned_refcat_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-refcat.fits'
-        log.info(f"Realigned refcat filename: {realigned_refcat_filename}")
+        print(f"Realigned refcat filename: {realigned_refcat_filename}")
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
                     realigned_refcat_filename)
         realigned = realign_to_catalog(reftbl['skycoord'],
@@ -481,10 +510,11 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
                                        max_offset=(0.4 if wavelength > 250 else 0.2)*u.arcsec,
                                        mag_limit=20,
                                        proposal_id=proposal_id,
-                                       imfile=realigned_refcat_filename
-                                      )
+                                       imfile=realigned_refcat_filename,
+                                       #raoffset=raoffset, decoffset=decoffset
+                                       )
 
-        log.info(f"Removing saturated stars.  cwd={os.getcwd()}")
+        print(f"Removing saturated stars.  cwd={os.getcwd()}")
         try:
             remove_saturated_stars(f'jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-merged_i2d.fits')
             remove_saturated_stars(f'jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-vvv.fits')
@@ -494,12 +524,34 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
     globals().update(locals())
     return locals()
 
-def fix_alignment(fn, proposal_id, module, field, basepath, filtername):
+def fix_alignment(fn, proposal_id=None, module=None, field=None, basepath=None, filtername=None):
     if os.path.exists(fn):
-        print(f"Running manual align for {module} data ({proposal_id} + {field}): {fn}")
+        print(f"Running manual align for {module} data ({proposal_id} + {field}): {fn}", flush=True)
     else:
-        print(f"Skipping manual align for nonexistent file {module} ({proposal_id} + {field}): {fn}")
+        print(f"Skipping manual align for nonexistent file {module} ({proposal_id} + {field}): {fn}", flush=True)
         return
+
+    mod = ImageModel(fn)
+    if proposal_id is None:
+        proposal_id = os.path.basename(fn)[3:7]
+    if filtername is None:
+        try:
+            filtername = filter_regex.search(fn).group()
+        except AttributeError:
+            filters = tuple(map(str.lower, (mod.meta.instrument.filter, mod.meta.instrument.pupil)))
+            if 'clear' in filters:
+                filtername = [x for x in filters if x != 'clear'][0]
+            else:
+                # any filter that is not the wideband filter
+                filtername = [x for x in filters if 'W' not in x][0]
+    if field is None:
+        field = mod.meta.observation.observation_number
+    if basepath is None:
+        basepath = f'/orange/adamginsburg/jwst/{field_name}'
+    if module is None:
+        module = 'nrc' + mod.meta.instrument.module.lower()
+
+
     if (field == '004' and proposal_id == '1182') or (field == '001' and proposal_id == '2221'):
         offsets_tbl = Table.read(f'{basepath}/offsets/Offsets_JWST_Brick{proposal_id}.csv')
         exposure = int(fn.split("_")[-3])
@@ -533,6 +585,9 @@ def fix_alignment(fn, proposal_id, module, field, basepath, filtername):
             if 'nrca' in thismodule.lower():
                 decshift += 0.1*u.arcsec
                 rashift += -0.23*u.arcsec
+    else:
+        rashift = 0*u.arsec
+        decshift = 0*u.arsec
     print(f"Shift for {fn} is {rashift}, {decshift}")
     align_fits = fits.open(fn)
     if 'RAOFFSET' in align_fits[1].header:
@@ -568,12 +623,13 @@ def check_wcs(fn):
         wcsobj = fa.meta.wcs
         print(f"fa['meta']['wcs'] crval={wcsobj.to_fits()[0]['CRVAL1']}, {wcsobj.to_fits()[0]['CRVAL2']}, {wcsobj.forward_transform.param_sets[-1]}")
         new_1024 = wcsobj.pixel_to_world(1024, 1024)
-        print(f"pixel_to_world(1024,1024) = {new_1024}")
+        print(f"new pixel_to_world(1024,1024) = {new_1024}")
         if 'oldwcs' in fa.meta:
             oldwcsobj = fa.meta.oldwcs
             print(f"fa['meta']['oldwcs'] crval={oldwcsobj.to_fits()[0]['CRVAL1']}, {oldwcsobj.to_fits()[0]['CRVAL2']}, {oldwcsobj.forward_transform.param_sets[-1]}")
             old_1024 = oldwcsobj.pixel_to_world(1024, 1024)
-            print(f"pixel_to_world(1024,1024) = {old_1024}, sep={old_1024.separation(new_1024)}")
+            print(f"old pixel_to_world(1024,1024) = {old_1024}, sep from new GWCS={old_1024.separation(new_1024).to(u.arcsec)}")
+        img.close()
 
 
         # FITS header
@@ -585,7 +641,8 @@ def check_wcs(fn):
             print("RA, DE offset: ", fh[1].header['RAOFFSET'], fh[1].header['DEOFFSET'])
         ww = WCS(fh[1].header)
         fits_1024 = ww.pixel_to_world(1024, 1024)
-        print(f"pixel_to_world(1024,1024) = {fits_1024}, sep={fits_1024.separation(new_1024)}")
+        print(f"FITS pixel_to_world(1024,1024) = {fits_1024}, sep from new GWCS={fits_1024.separation(new_1024).to(u.arcsec)}")
+        fh.close()
     else:
         print(f"COULD NOT CHECK WCS FOR {fn}: does not exist")
 

@@ -10,11 +10,44 @@ from astropy.visualization import quantity_support
 from astropy import log
 from astropy.table import Table
 import warnings
+from jwst.datamodels import ImageModel
 
 from astropy.wcs import WCS
 from astropy.io import fits
 
 import datetime
+
+
+def diagnostic_plots(fn, refcrds, meascrds, dra, ddec, savename=None):
+    import pylab as pl
+    from astropy.visualization import simple_norm
+    fig = pl.figure(dpi=200)
+    ax1 = pl.subplot(2, 2, 1)
+    ra = meascrds.ra
+    dec = meascrds.dec
+    ax1.quiver(ra.to(u.deg).value, dec.to(u.deg).value, dra.to(u.arcsec).value, ddec.to(u.arcsec).value)
+
+    img = ImageModel(fn)
+    ww = img.meta.wcs
+    ax2 = pl.subplot(2, 2, 2, projection=ww)
+    ax2.imshow(img.data, cmap='gray_r', norm=simple_norm(img.data, min_percent=1, max_percent=99, stretch='asinh'))
+    ax2.scatter_coord(refcrds, marker='x', color='r')
+
+    ax3 = pl.subplot(2, 2, 3, projection=ww)
+    ax3.imshow(img.data, cmap='gray_r', norm=simple_norm(img.data, min_percent=1, max_percent=99, stretch='asinh'))
+    ax3.scatter_coord(refcrds, marker='x', color='r')
+    ax3.scatter_coord(meascrds, marker='+', color='b')
+    ax3.axis([1000,1200,1000,1200])
+
+    ax4 = pl.subplot(2, 2, 4, projection=ww)
+    ax4.imshow(img.data, cmap='gray_r', norm=simple_norm(img.data, min_percent=1, max_percent=99, stretch='asinh'))
+    ax4.scatter_coord(refcrds, marker='x', color='r')
+    ax4.scatter_coord(meascrds, marker='+', color='b')
+    ax4.axis([200,400,200,400])
+
+    if savename is not None:
+        pl.tight_layout()
+        pl.savefig(savename, bbox_inches='tight')
 
 def print(*args, **kwargs):
     now = datetime.datetime.now().isoformat()
@@ -225,6 +258,9 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
     idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat_new[sel], max_offset)
     dra = (skycrds_cat_new[sel][idx].ra - reference_coordinates[sidx].ra).to(u.arcsec)
     ddec = (skycrds_cat_new[sel][idx].dec - reference_coordinates[sidx].dec).to(u.arcsec)
+
+    pngname = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{fieldnumber}_t001_nircam_clear-{filtername}-{module}_xmatch_diagnostics.png'
+    diagnostic_plots(imfile, reference_coordinates, skycrds_cat_new[sel][idx], dra, ddec, savename=pngname)
 
     print(f'After realignment, offset is {np.median(dra)}, {np.median(ddec)} with {len(idx)} matches')
 
