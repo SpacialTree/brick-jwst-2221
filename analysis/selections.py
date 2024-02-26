@@ -46,9 +46,9 @@ from analysis_setup import (basepath, reg, regzoom, distance_modulus,
                             filternames, basetable, plot_tools, basetable,
                             basetable_merged_reproject,
                             basetable_merged, basetable_nrca, basetable_nrcb,
-                            basetable_merged_reproject_dao_iter_bg_epsf ,
-                            basetable_merged_reproject_dao_iter_epsf,
-                            basetable_merged_reproject_dao_iter,
+                            #basetable_merged_reproject_dao_iter_bg_epsf ,
+                            #basetable_merged_reproject_dao_iter_epsf,
+                            #basetable_merged_reproject_dao_iter,
                             )
 from plot_tools import regzoomplot, starzoom
 

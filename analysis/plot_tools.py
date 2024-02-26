@@ -2,6 +2,7 @@ import numpy as np
 import regions
 import warnings
 import glob
+import os
 from astropy.io import fits
 from astropy import stats
 import pylab as pl
@@ -26,17 +27,22 @@ import matplotlib.patches as patches
 
 from filtering import get_fwhm
 
-basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
+os.environ["CRDS_PATH"] = "/orange/adamginsburg/jwst/brick/crds/"
+os.environ["CRDS_SERVER_URL"] = "https://jwst-crds.stsci.edu"
+from jwst.datamodels import ImageModel
+
+basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
+basepath_brick = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 
 sqgrid = strategies.SquareStrategy()
 rectgrid = strategies.RectangularStrategy()
 
-mist = Table.read(f'{basepath}/isochrones/MIST_iso_633a08f2d8bb1.iso.cmd', header_start=12, data_start=13, format='ascii', delimiter=' ', comment='#')
+mist = Table.read(f'{basepath_brick}/isochrones/MIST_iso_633a08f2d8bb1.iso.cmd', header_start=12, data_start=13, format='ascii', delimiter=' ', comment='#')
 # Hack, but good enough to first order
 mist['410M405'] = mist['F410M']
 mist['405M410'] = mist['F405N']
-padova = Table.read(f'{basepath}/isochrones/padova_isochrone_package.dat', header_start=14, data_start=15, format='ascii', delimiter=' ', comment='#')
+padova = Table.read(f'{basepath_brick}/isochrones/padova_isochrone_package.dat', header_start=14, data_start=15, format='ascii', delimiter=' ', comment='#')
 
 
 
@@ -440,7 +446,7 @@ def ccds_withiso(basetable, sel=True,
 
 def xmatch_plot(basetable, ref_filter='f405n', filternames=filternames,
                 maxsep=0.13*u.arcsec, obsid='001', sel=None, axlims=[-0.5, 0.5, -0.5, 0.5],
-                regs=['brick_nrca.reg', 'brick_nrcb.reg']):
+                regs=['brick_nrca.reg', 'brick_nrcb.reg'], module='merged-reproject', save_output=False):
     statsd = {}
     fig1 = pl.figure(1)
     fig2 = pl.figure(2)
@@ -451,8 +457,10 @@ def xmatch_plot(basetable, ref_filter='f405n', filternames=filternames,
 
     basecrds = basetable[f'skycoord_{ref_filter}']
 
-    refhdr = fits.getheader(f'{basepath}/{ref_filter.upper()}/pipeline/jw02221-o{obsid}_t001_nircam_clear-{ref_filter}-merged-reproject_i2d.fits')
-    refwcs = WCS(refhdr)
+    refhdr = fits.getheader(f'{basepath}/{ref_filter.upper()}/pipeline/jw02221-o{obsid}_t001_nircam_clear-{ref_filter}-{module}_i2d.fits')
+    # refwcs = WCS(refhdr)
+    im = ImageModel(f'{basepath}/{ref_filter.upper()}/pipeline/jw02221-o{obsid}_t001_nircam_clear-{ref_filter}-{module}_i2d.fits')
+    refwcs = im.get_fits_wcs()
 
     gridspec = sqgrid.get_grid(5)
     ii = 0
@@ -514,6 +522,9 @@ def xmatch_plot(basetable, ref_filter='f405n', filternames=filternames,
     fig2.supxlabel("Offset (\")")
     fig1.tight_layout()
     fig2.tight_layout()
+    if save_output:
+        fig1.savefig(f"{basepath}/analysis/scatter_offsets.png")
+        fig2.savefig(f"{basepath}/analysis/hist_offsets.png")
     return statsd
 
 def starzoom(coords, cutoutsize=1*u.arcsec, fontsize=14,
