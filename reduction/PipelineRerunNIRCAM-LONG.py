@@ -608,11 +608,6 @@ def fix_alignment(fn, proposal_id=None, module=None, field=None, basepath=None, 
         else:
             decshift = 0*u.arcsec
             rashift = 0*u.arcsec
-        if filtername.upper() in ('F212N', 'F187N', 'F182M'):
-            print('Short wavelength offset correction.')
-            if 'nrca' in thismodule.lower():
-                decshift += 0.1*u.arcsec
-                rashift += -0.23*u.arcsec
     else:
         rashift = 0*u.arsec
         decshift = 0*u.arsec
