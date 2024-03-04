@@ -216,7 +216,7 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
         tweakreg_parameters.update({'fitgeometry': 'general',
                                     # brightest = 5000 was causing problems- maybe the cross-alignment was getting caught on PSF artifacts?
                                     'brightest': 5000,
-                                    'snr_threshold': 30, # was 5, but that produced too many stars
+                                    'snr_threshold': 20, # was 5, but that produced too many stars
                                     # define later 'abs_refcat': abs_refcat,
                                     'save_catalogs': True,
                                     'catalog_format': 'fits',
@@ -571,7 +571,7 @@ def fix_alignment(fn, proposal_id=None, module=None, field=None, basepath=None, 
         thismodule = fn.split("_")[-2]
         visit = fn.split("_")[0]
         if use_average:
-            tblfn = f'{basepath}/offsets/Offsets_JWST_Brick{proposal_id}_average.csv'
+            tblfn = f'{basepath}/offsets/Offsets_JWST_Brick{proposal_id}_VVV_average.csv'
             print(f"Using average offset table {tblfn}")
             offsets_tbl = Table.read(tblfn)
             match = (
