@@ -34,6 +34,7 @@ import PIL
 import pyavm
 
 import pylab as pl
+import matplotlib.pyplot as plt
 pl.rcParams['figure.facecolor'] = 'w'
 pl.rcParams['image.origin'] = 'lower'
 pl.rcParams['figure.figsize'] = (10,8)

@@ -127,8 +127,8 @@ if target == 'brick':
     basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged_20231003.fits')
 elif target == 'cloudc':
     # use locked-in 2024/20/2 version to make sure analysis stays stable
-    basetable_merged = basetable = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged_photometry_tables_merged_2024202.fits')
-    basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged_2024202.fits')
+    basetable_merged = basetable = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged_photometry_tables_merged.fits')
+    basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged.fits')
 
 basetable_nrca = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_nrca_photometry_tables_merged.fits')
 basetable_nrcb = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_nrcb_photometry_tables_merged.fits')

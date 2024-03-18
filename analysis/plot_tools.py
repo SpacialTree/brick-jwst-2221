@@ -21,6 +21,7 @@ from astroquery.vizier import Vizier
 from dust_extinction.averages import RRP89_MWGC, CT06_MWGC, F11_MWGC
 from dust_extinction.parameter_averages import CCM89
 import matplotlib as mpl
+from astropy.visualization import quantity_support
 
 from matplotlib.path import Path
 import matplotlib.patches as patches
@@ -841,6 +842,7 @@ def make_sed(coord, basetable, idx=None, radius=0.5*u.arcsec):
             eff_width = filter_table.loc[f'{telescope}/{instrument}.{filtername}']['WidthEff'] * u.AA
             widths.append(eff_width)
 
+    fluxes = [fluxes[i].value.item()*fluxes[i].unit for i in range(len(fluxes))]
     return wavelengths, widths, fluxes, lims
 
 
@@ -853,12 +855,20 @@ def sed_and_starzoom_plot(coord, basetable, idx=None, fignum=1, title=None, modu
             warnings.simplefilter('ignore')
 
             wavelengths, widths, fluxes, lims = map(u.Quantity, make_sed(coord, basetable=basetable, radius=1*u.arcsec, idx=idx))
+            #make_sed(coord, basetable=basetable, radius=1*u.arcsec, idx=idx)
+            #
+            #lamflam = [(fluxes[i] * wavelengths[i].to(u.Hz, u.spectral())).to(u.erg/u.s/u.cm**2) for i in range(len(wavelengths))]
             lamflam = (fluxes * wavelengths.to(u.Hz, u.spectral())).to(u.erg/u.s/u.cm**2)
+            #lamflamlim = [(lims[i] * wavelengths[i].to(u.Hz, u.spectral())).to(u.erg/u.s/u.cm**2) for i in range(len(wavelengths))]
             lamflamlim = (lims * wavelengths.to(u.Hz, u.spectral())).to(u.erg/u.s/u.cm**2)
-            ax.errorbar(u.Quantity(wavelengths, u.um), 
-                        lamflam,
-                        xerr=[w/2 for w in widths], linestyle='none', marker='x')
-            ax.errorbar(wavelengths.to(u.um), lamflamlim, xerr=[w/2 for w in widths], linestyle='none', marker='v')
+            with quantity_support():
+                ax.errorbar(u.Quantity(wavelengths, u.um), 
+                            u.Quantity(lamflam),
+                            xerr=[w.to(u.um)/2 for w in widths], linestyle='none', marker='x')
+                ax.errorbar(u.Quantity(wavelengths, u.um), 
+                            u.Quantity(lamflamlim), 
+                            xerr=[w.to(u.um)/2 for w in widths], linestyle='none', marker='v')
+                #ax.errorbar(u.Quantity(wavelengths, u.um).value, lamflamlim.value, xerr=[w.to(u.um).value/2 for w in widths], linestyle='none', marker='v')
             if title is None:
                 ax.set_title(f"{coord}")
             else:
