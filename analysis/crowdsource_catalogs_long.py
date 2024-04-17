@@ -285,7 +285,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
     print(f"options: {options}")
 
-    for module in modules: # jw02221-o001_t001_miri_f2550w_i2d.fits
+    for module in modules:
         detector = module # no sub-detectors for long-NIRCAM
         for filtername in filternames:
             print(f"Starting filter {filtername}", flush=True)
@@ -293,10 +293,6 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             row = fwhm_tbl[fwhm_tbl['Filter'] == filtername]
             fwhm = fwhm_arcsec = float(row['PSF FWHM (arcsec)'][0])
             fwhm_pix = float(row['PSF FWHM (pixel)'][0])
-
-            wavelength = int(filtername[1:-1])
-            if wavelength < 500:
-                
 
             desat = '_unsatstar' if use_desaturated else ''
             bgsub = '_bgsub' if options.bgsub else ''
