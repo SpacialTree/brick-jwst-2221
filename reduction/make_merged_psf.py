@@ -104,6 +104,81 @@ def make_merged_psf(filtername, basepath, halfstampsize=25,
 
     return NDData(cdata, meta=psfmeta)
 
+## Unfinished
+#def make_miri_psf(filtername, basepath, halfstampsize=25,
+#                  grid_step=200,
+#                  oversampling=1,
+#                  project_id='2221', obs_id='001', suffix='_i2d'):
+#    print('UNFINISHED AND WILL LIKELY CRASH')
+#    wavelength = int(filtername[1:-1])
+#    mir = webbpsf.MIRI()
+#    mir.filter = filtername
+#    grids = {}
+#
+#    savefilename = f'miri_{filtername.lower()}_fovp101_samp4_npsf16.fits'
+#
+#    if os.path.exists(savefilename):
+#        grid = to_griddedpsfmodel(savefilename)
+#    else:
+#        #mir.detector = detector
+#        grid = mir.psf_grid(num_psfs=16, oversample=oversampling, all_detectors=False, verbose=True, save=True)
+#
+#    #grids[detector.upper()] = grid
+#
+#    parent_file = fits.open(f'{basepath}/{filtername}/pipeline/jw0{project_id}-o{obs_id}_t001_miri_{filtername.lower()}{suffix}.fits') 
+#    # jw02221-o001_t001_miri_f2550w_i2d.fits
+#    parent_wcs = WCS(parent_file[1].header)
+#
+#    pshape = parent_file[1].data.shape
+#    psf_grid_y, psf_grid_x = np.mgrid[0:pshape[0]:grid_step, 0:pshape[1]:grid_step]
+#    psf_grid_coords = list(zip(psf_grid_x.flat, psf_grid_y.flat))
+#
+#    psfmeta = {'grid_xypos': psf_grid_coords,
+#               'oversampling': oversampling
+#              }
+#    allpsfs = []
+#
+#    for ii,(pgxc, pgyc) in tqdm(enumerate(psf_grid_coords)):
+#        skyc1 = parent_wcs.pixel_to_world(pgxc, pgyc)
+#
+#        psfs = []
+#        for detector in detectors:
+#            if detector.endswith('5'):
+#                # name scheme: short is nrca1 nrca2 ..., long is nrcalong
+#                detectorstr = detector.replace('5', 'long').lower()
+#            else:
+#                detectorstr = detector.lower()
+#            for fn in glob.glob(f'{basepath}/{filtername}/pipeline/*{detectorstr.lower()}*_cal.fits'):
+#                dmod = stdatamodels.jwst.datamodels.open(fn)
+#                xc, yc = dmod.meta.wcs.world_to_pixel(skyc1)
+#                if footprint_contains(xc, yc, dmod.data.shape):
+#                    # force xc, yc to integers so they stay centered
+#                    # (mgrid is forced to be integers, and allowing xc/yc not to be would result in arbitrary subpixel shifts)
+#                    # oversamplign allows non-integers again though, and increases the grid size
+#                    yy, xx = np.mgrid[int(yc)-halfstampsize:int(yc)+halfstampsize:1/oversampling,
+#                                      int(xc)-halfstampsize:int(xc)+halfstampsize:1/oversampling]
+#                    psf = grids[f'{detector.upper()}'].evaluate(x=xx, y=yy, flux=1, x_0=int(xc), y_0=int(yc))
+#                    psfs.append(psf)
+#
+#        if len(psfs) > 0:
+#            meanpsf = np.mean(psfs, axis=0)
+#        else:
+#            meanpsf = np.zeros((halfstampsize*2*oversampling, halfstampsize*2*oversampling))
+#        allpsfs.append(meanpsf)
+#        psfmeta[f'DET_YX{ii}'] =  (str((float(pgyc), float(pgxc))),
+#                                   "The #{} PSF's (y,x) detector pixel position".format(ii))
+#    psfmeta['OVERSAMP'] = oversampling
+#    psfmeta['DET_SAMP'] = oversampling
+#    psfmeta['FILTER'] = filtername
+#
+#    allpsfs = np.array(allpsfs)
+#
+#    cdata = allpsfs / allpsfs.sum(axis=(1,2))[:,None,None]
+#    avg = np.nanmean(cdata, axis=0)
+#    cdata[np.any(np.isnan(cdata), axis=(1,2)), :, :] = avg
+#
+#    return NDData(cdata, meta=psfmeta)
+
 def save_psfgrid(psfg,  outfilename, overwrite=True):
     xypos = fits.ImageHDU(np.array(psfg.meta['grid_xypos']))
     meta = copy.copy(psfg.meta)
@@ -204,12 +279,20 @@ if __name__ == "__main__":
                 outfilename = f'{basepath}/psfs/{filtername.upper()}_{project_id}_{obs_id}_merged_PSFgrid_oversample{oversampling}.fits'
                 if not os.path.exists(outfilename):
                     print(f"Making PSF grid {outfilename}")
+                    #if wavelength < 500:
                     psfg = make_merged_psf(filtername.upper(),
                                         basepath=basepath,
                                         halfstampsize=halfstampsize,
                                         grid_step=200 if wavelength > 230 else 400,
                                         oversampling=oversampling,
                                         project_id=project_id, obs_id=obs_id, suffix='merged_i2d')
+                    #else: 
+                    #    psfg = make_miri_psf(filtername.upper(),
+                    #                        basepath=basepath,
+                    #                        halfstampsize=halfstampsize,
+                    #                        grid_step=200 if wavelength > 230 else 400,
+                    #                        oversampling=oversampling,
+                    #                        project_id=project_id, obs_id=obs_id, suffix='_i2d')
                     save_psfgrid(psfg, outfilename=outfilename, overwrite=True)
                 else:
                     print(f"PSF grid {outfilename} exists!  Fixing metadata if needed")
