@@ -29,7 +29,7 @@ def make_merged_psf(filtername, basepath, halfstampsize=25,
     nrc.filter = filtername
     grids = {}
     for detector in detectors:
-        savefilename = f'nircam_{detector.lower()}_{filtername.lower()}_fovp101_samp4_npsf16.fits'
+        savefilename = f'miri_{detector.lower()}_{filtername.lower()}_fovp101_samp4_npsf16.fits'
         if os.path.exists(savefilename):
             # gridfh = fits.open(savefilename)
             # ndd = NDData(gridfh[0].data, meta=dict(gridfh[0].header))
