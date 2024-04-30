@@ -31,6 +31,7 @@ pl.rcParams['figure.dpi'] = 100
 
 #basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
+miri_filternames = ['f2250w']
 all_filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m', 'f444w', 'f356w', 'f200w', 'f115w']
 #obs_filters = {'2221': filternames,
 #               '1182': ['f444w', 'f356w', 'f200w', 'f115w']
@@ -62,7 +63,6 @@ project_obsnum = {
                       '2221': '002',
                              },
                  }
-
 
 def getmtime(x):
     return datetime.datetime.fromtimestamp(os.path.getmtime(x)).strftime('%Y-%m-%d %H:%M:%S')
