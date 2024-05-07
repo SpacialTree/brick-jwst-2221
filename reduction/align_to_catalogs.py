@@ -184,7 +184,8 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
                        mag_limit=15,
                        catfile=None, imfile=None,
                        threshold=0.001*u.arcsec,
-                       raoffset=0*u.arcsec, decoffset=0*u.arcsec):
+                       raoffset=0*u.arcsec, decoffset=0*u.arcsec,
+                       check_vega=True):
     if catfile is None:
         catfile = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{fieldnumber}_t001_nircam_clear-{filtername}-{module}_cat.ecsv'
         print(f"Catalog file was None, so defaulting to {catfile}")
@@ -199,14 +200,17 @@ def realign_to_catalog(reference_coordinates, filtername='f212n',
     # it seems to hold for all of the fields, kinda?
     #sel = (flux > 7e-8*500*u.Jy) & (flux < 4000*7e-8*u.Jy)
 
-    # Manual checking in CARTA: didn't look like any good matches at mag>15
-    mag = cat['aper_total_vegamag']
-    sel = mag < mag_limit
-    log.info(f"For {filtername} {module} {fieldnumber} catalog {catfile}, found {sel.sum()} of {sel.size} sources meeting criteria mag<{mag_limit}")
+    if check_vega: 
+        # Manual checking in CARTA: didn't look like any good matches at mag>15
+        mag = cat['aper_total_vegamag']
+        sel = mag < mag_limit
+        log.info(f"For {filtername} {module} {fieldnumber} catalog {catfile}, found {sel.sum()} of {sel.size} sources meeting criteria mag<{mag_limit}")
 
-    if sel.sum() == 0:
-        print(f"min mag: {np.nanmin(mag)}, max mag: {np.nanmax(mag)}")
-        raise ValueError("No sources passed basic selection criteria")
+        if sel.sum() == 0:
+            print(f"min mag: {np.nanmin(mag)}, max mag: {np.nanmax(mag)}")
+            raise ValueError("No sources passed basic selection criteria")
+    else:
+        sel = np.full(len(cat), True)
 
     # don't trust the sky coords, recompute them from the current WCS (otherwise we can double-update)
     # skycrds_cat_orig = cat['sky_centroid']

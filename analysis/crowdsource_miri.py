@@ -291,7 +291,8 @@ def main(bg_boxsizes={'f2550w':11}, # need to confirm this using BackgroundEstim
         detector = ''
 
         pupil = 'clear'
-        filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_miri_{filtername.lower()}_i2d.fits'
+        #filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_miri_{filtername.lower()}_i2d.fits'
+        filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_miri_{filtername.lower()}_realigned-to-refcat.fits'
 
         if not os.path.exists(filename):
             raise ValueError(f"File {filename} does not exist.")

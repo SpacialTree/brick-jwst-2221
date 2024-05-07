@@ -71,7 +71,7 @@ def merge_catalogs(basetable, basepath='/orange/adamginsburg/jwst/cloudc/'):
                 basetable[f'mask_{wl}'] = badsep
             else:
                 basetable[f'{cn}_{wl}'] = MaskedColumn(data=basetable[cn], name=f'{cn}_{wl}')
-                #basetable[f'{cn}_{wl}'].mask[badsep] = True
+                basetable[f'{cn}_{wl}'].mask[badsep] = True
                 if hasattr(basetable[cn], 'meta'):
                     basetable[f'{cn}_{wl}'].meta = basetable[cn].meta
                 basetable.remove_column(cn)
@@ -160,7 +160,7 @@ def real_miri(basepath):
 
     cat = Table.read(f'{basepath}/F2550W/f2550w__crowdsource_nsky1.fits')
     crds = cat['skycoord']
-    manual_reg = regions.Regions.read(f'{basepath}/regions_/miri_catalog.reg', format='ds9')
+    manual_reg = regions.Regions.read(f'{basepath}/regions_/miri_catalog_new.reg', format='ds9')
     ra = []
     dec = []
     for reg in manual_reg: 

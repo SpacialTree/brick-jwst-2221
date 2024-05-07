@@ -3,6 +3,7 @@ import regions
 import pyavm
 import numpy as np
 import PIL
+import shutil
 
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -23,7 +24,7 @@ available_filters = {
                      'cloudc': ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m'],
                     }
 
-def save_rgb(img, filename, flip=-1):
+def save_rgb(img, filename, flip=-1, avm=None):
     #mask = (~np.isnan(img[:,:,0]))
     #mask_0 = np.logical_and(img[:,:,0]==0, img[:,:,1]==0, img[:,:,2]==0)
 
@@ -60,6 +61,23 @@ def save_rgb(img, filename, flip=-1):
     img = PIL.Image.fromarray(img[::flip,:,:], mode='RGBA')
     img.save(filename)
 
+    if avm is not None:
+        avm.embed(filename, filename.replace('.png', '_avm.png'))
+        shutil.move(filename.replace('.png', '_avm.png'), filename)
+    
+"""
+def save_rgb(img, filename, flip=-1, avm=None):
+    img = (img*256)
+    img[img<0] = 0
+    img[img>255] = 255
+    img = img.astype('uint8')
+    img = PIL.Image.fromarray(img[::-1,:,:])
+    img.save(filename)
+    if avm is not None:
+        avm.embed(filename, 'avm_'+filename)
+        shutil.move('avm_'+filename, filename)
+"""
+
 def two_filter_tricolor(filternames, target, module, basepath):
     rgb = [
         f'{basepath}/images/{filternames[0][:-1].upper()}_reproj_{module}-fortricolor.fits',
@@ -94,7 +112,7 @@ def two_filter_tricolor(filternames, target, module, basepath):
     plt.yticks([]);
 
     outfn = f"{basepath}/images/{target}JWST_{module}_R-{filternames[0]}_B-{filternames[1]}_rotated.png"
-    save_rgb(rgb_scaled, outfn, flip=-1)
+    save_rgb(rgb_scaled, outfn, flip=-1, avm=AVM)
     AVM.embed(outfn, outfn)
     
 
@@ -129,7 +147,7 @@ def three_filter_tricolor(filternames, target, module, basepath):
     plt.yticks([]);
 
     outfn = f"{basepath}/images/{target}JWST_{module}_R-{filternames[0]}_G-{filternames[1]}_B-{filternames[2]}_rotated.png"
-    save_rgb(rgb_scaled, outfn, flip=-1)
+    save_rgb(rgb_scaled, outfn, flip=-1, avm=AVM)
     AVM.embed(outfn, outfn)
 
 def get_cutout(filename, position, l, w, format='fits'):
@@ -177,7 +195,7 @@ def spitzer_tricolor(position, l, w, target, basepath):
     plt.yticks([]);
 
     outfn = f"{basepath}/images/{target}Spitzer_R-I4_G-I3_B-I2.png"
-    save_rgb(rgb_scaled, outfn, flip=-1)
+    save_rgb(rgb_scaled, outfn, flip=-1, avm=AVM)
     AVM.embed(outfn, outfn)
 
 # Run reproj_fortricolor first to have the files available
@@ -191,67 +209,67 @@ def main():
 
     target = 'cloudc'
     basepath = f'/orange/adamginsburg/jwst/{target}/'
-    module = 'merged'
+    module = 'merged-reproject'
     
-    #filternames = ['F466N', 'F405N']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F212N', 'F187N']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F405N', 'F212N']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F410M', 'F182M']
-    #two_filter_tricolor(filternames, target, module, basepath)
+    filternames = ['F466N', 'F405N']
+    two_filter_tricolor(filternames, target, module, basepath)
     
-    #filternames = ['F466N', 'F410M']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F212N', 'F182M']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #filternames = ['F405N', 'F182M']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F405N', 'F187N']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F466N', 'F182M']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F466N', 'F187N']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F410M', 'F405N']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F466N', 'F410M']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F182M', 'F187N']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F212N', 'F182M']
-    #two_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F466N', 'F405N', 'F187N']
-    #three_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F466N', 'F405N', 'F212N']
-    #three_filter_tricolor(filternames, target, module, basepath)
-    #
-    #filternames = ['F405N', 'F212N', 'F187N']
-    #three_filter_tricolor(filternames, target, module, basepath)
+    filternames = ['F212N', 'F187N']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F405N', 'F212N']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F410M', 'F182M']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F466N', 'F410M']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F212N', 'F182M']
+    two_filter_tricolor(filternames, target, module, basepath)
+    filternames = ['F405N', 'F182M']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F405N', 'F187N']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F466N', 'F182M']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F466N', 'F187N']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F410M', 'F405N']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F466N', 'F410M']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F182M', 'F187N']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F212N', 'F182M']
+    two_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F466N', 'F405N', 'F187N']
+    three_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F466N', 'F405N', 'F212N']
+    three_filter_tricolor(filternames, target, module, basepath)
+    
+    filternames = ['F405N', 'F212N', 'F187N']
+    three_filter_tricolor(filternames, target, module, basepath)
     
     filternames = ['F466N', 'F212N', 'F187N']
     three_filter_tricolor(filternames, target, module, basepath)
-
+#
     filternames = ['F466N', 'F410M', 'F405N']
     three_filter_tricolor(filternames, target, module, basepath)
-
+#
     filternames = ['F212N', 'F182M', 'F187N']
     three_filter_tricolor(filternames, target, module, basepath)
-
+#
     position = SkyCoord('17:46:21.4701708277', '-28:35:38.0673181068', unit=(u.hourangle, u.deg))
     l = 7*u.arcmin
     w = 10*u.arcmin
