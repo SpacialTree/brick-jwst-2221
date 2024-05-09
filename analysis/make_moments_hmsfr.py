@@ -11,6 +11,6 @@ import regions
 import glob, os
 import spectral_cube
 
-reg_hmsfr = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/hmsfr.reg')
+#reg_hmsfr = regions.Regions.read('/orange/adamginsburg/jwst/cloudc/regions/hmsfr.reg')
 
 

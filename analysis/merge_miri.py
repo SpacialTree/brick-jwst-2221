@@ -71,7 +71,7 @@ def merge_catalogs(basetable, basepath='/orange/adamginsburg/jwst/cloudc/'):
                 basetable[f'mask_{wl}'] = badsep
             else:
                 basetable[f'{cn}_{wl}'] = MaskedColumn(data=basetable[cn], name=f'{cn}_{wl}')
-                basetable[f'{cn}_{wl}'].mask[badsep] = True
+                #basetable[f'{cn}_{wl}'].mask[badsep] = True
                 if hasattr(basetable[cn], 'meta'):
                     basetable[f'{cn}_{wl}'].meta = basetable[cn].meta
                 basetable.remove_column(cn)
