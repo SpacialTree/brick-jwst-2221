@@ -26,14 +26,18 @@ from astropy.visualization import quantity_support
 from matplotlib.path import Path
 import matplotlib.patches as patches
 
+try:
+    from paths import basepath
+except ImportError:
+    basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
+import sys
+sys.path.append(f'{basepath}/analysis/')
+sys.path.append(f'{basepath}/reduction/')
+import filtering
 from filtering import get_fwhm
 
-os.environ["CRDS_PATH"] = "/orange/adamginsburg/jwst/brick/crds/"
-os.environ["CRDS_SERVER_URL"] = "https://jwst-crds.stsci.edu"
 from jwst.datamodels import ImageModel
 
-basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
-basepath_brick = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 
 sqgrid = strategies.SquareStrategy()

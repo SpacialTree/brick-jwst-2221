@@ -44,18 +44,23 @@ pl.rcParams['font.size'] = 16
 from optparse import OptionParser
 parser = OptionParser()
 
-parser.add_option("-t", "--target", dest="target",
-                  default='cloudc',
-                  help="target fields", metavar="target")
-(options, args) = parser.parse_args()
-target = options.target
-proposal_id = '2221'
-
-target_to_field_mapping = {'2221': {'brick': '001', 'cloudc': '002'},
-                           '1182': {'brick': '004'}}[proposal_id]
-field = target_to_field_mapping[target]
-
-basepath = f'/orange/adamginsburg/jwst/{target}/'
+#parser.add_option("-t", "--target", dest="target",
+#                  default='cloudc',
+#                  help="target fields", metavar="target")
+#(options, args) = parser.parse_args()
+#target = options.target
+#proposal_id = '2221'
+#
+#target_to_field_mapping = {'2221': {'brick': '001', 'cloudc': '002'},
+#                           '1182': {'brick': '004'}}[proposal_id]
+#field = target_to_field_mapping[target]
+#
+#basepath = f'/orange/adamginsburg/jwst/{target}/'
+try:
+    from paths import basepath
+except ImportError:
+    basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
+target = 'cloudc'
 
 sys.path.append(f'{basepath}/analysis/')
 sys.path.append(f'{basepath}/reduction/')
@@ -73,13 +78,14 @@ regzoom = regions.Regions.read(f'{basepath}/regions_/leftside_{target}_rezoom.re
 
 with warnings.catch_warnings():
     warnings.simplefilter('ignore')
-    fh_nrca = fits.open(f'{basepath}/F410M/pipeline/jw02221-o{field}_t001_nircam_clear-f410m-nrca_i2d.fits')
-    ww410_nrca = wcs.WCS(fh_nrca[1].header)
-    ww_nrca = ww410_nrca
 
-    fh_nrcb = fits.open(f'{basepath}/F410M/pipeline/jw02221-o{field}_t001_nircam_clear-f410m-nrcb_i2d.fits')
-    ww410_nrcb = wcs.WCS(fh_nrcb[1].header)
-    ww_nrcb = ww410_nrcb
+    #fh_nrca = fits.open(f'{basepath}/F410M/pipeline/jw02221-o001_t001_nircam_clear-f410m-nrca_i2d.fits')
+    #ww410_nrca = wcs.WCS(fh_nrca[1].header)
+    #ww_nrca = ww410_nrca
+
+    #fh_nrcb = fits.open(f'{basepath}/F410M/pipeline/jw02221-o001_t001_nircam_clear-f410m-nrcb_i2d.fits')
+    #ww410_nrcb = wcs.WCS(fh_nrcb[1].header)
+    #ww_nrcb = ww410_nrcb
 
     fh_merged = fits.open(f'{basepath}/F410M/pipeline/jw02221-o{field}_t001_nircam_clear-f410m-merged_i2d.fits')
     ww410_merged = wcs.WCS(fh_merged[1].header)
@@ -114,6 +120,20 @@ elif target == 'cloudc':
     print('I don\'t want to have to open these if I don\'t need to.')
 
 if target == 'brick':
+    avm_nostars = pyavm.AVM.from_image(f'{basepath}/images/BrickJWST_longwave_RGB_unrotated.png')
+    img_nostars = np.array(PIL.Image.open(f'{basepath}/images/BrickJWST_longwave_RGB_unrotated.png'))[::-1,:,:]
+    wwi_nostars = wcs.WCS(fits.Header.fromstring(avm_nostars.Spatial.FITSheader))
+
+
+    avm_nostars_merged = pyavm.AVM.from_image(f'{basepath}/images/BrickJWST_merged_longwave_narrowband_rotated.png')
+    img_nostars_merged = np.array(PIL.Image.open(f'{basepath}/images/BrickJWST_merged_longwave_narrowband_rotated.png'))[::-1,:,:]
+    wwi_nostars_merged = wcs.WCS(fits.Header.fromstring(avm_nostars.Spatial.FITSheader))
+
+    avm_short_merged = pyavm.AVM.from_image(f'{basepath}/images/BrickJWST_shortwave_RGB_187_212_182.png')
+    img_short_merged = np.array(PIL.Image.open(f'{basepath}/images/BrickJWST_shortwave_RGB_187_212_182.png'))[::-1,:,:]
+    wwi_short_merged = wcs.WCS(fits.Header.fromstring(avm_nostars.Spatial.FITSheader))
+
+
     # the merged version is the one I *want* to work with, but nrca is the one I've tested most
     # and can really vouch for
     basetable_merged = basetable = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged.fits')
@@ -130,19 +150,21 @@ elif target == 'cloudc':
     basetable_merged = basetable = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged_photometry_tables_merged.fits')
     basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged.fits')
 
-basetable_nrca = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_nrca_photometry_tables_merged.fits')
-basetable_nrcb = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_nrcb_photometry_tables_merged.fits')
+#basetable_merged_reproject_dao_iter = Table.read(f'{basepath}/catalogs/iterative_merged-reproject_photometry_tables_merged.fits')
+#basetable_merged_reproject_dao_iter_epsf = Table.read(f'{basepath}/catalogs/iterative_merged-reproject_photometry_tables_merged_epsf.fits')
+#basetable_merged_reproject_dao_iter_bg_epsf = Table.read(f'{basepath}/catalogs/iterative_merged-reproject_photometry_tables_merged_bgsub_epsf.fits')
 
 if target == 'brick':
     basetable_merged_reproject_dao_iter = Table.read(f'{basepath}/catalogs/iterative_merged-reproject_photometry_tables_merged.fits')
     basetable_merged_reproject_dao_iter_epsf = Table.read(f'{basepath}/catalogs/iterative_merged-reproject_photometry_tables_merged_epsf.fits')
     basetable_merged_reproject_dao_iter_bg_epsf = Table.read(f'{basepath}/catalogs/iterative_merged-reproject_photometry_tables_merged_bgsub_epsf.fits')
+    basetable_merged1182 = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged.fits')
 elif target == 'cloudc':
     print('no daophot stuff done for cloud c yet...')
 
 def getmtime(x):
     return datetime.datetime.fromtimestamp(os.path.getmtime(x)).strftime('%Y-%m-%d %H:%M:%S')
 
-for module in ('nrca', 'nrcb', 'merged', 'merged-reproject'):
+for module in ('merged', 'merged-reproject'):
     fn = f'{basepath}/catalogs/crowdsource_nsky0_{module}_photometry_tables_merged.fits'
     print(f"For module {module} catalog {os.path.basename(fn)}, mod date is {getmtime(fn)}")
