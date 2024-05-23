@@ -496,7 +496,7 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
             filtered_errest = np.nanmedian(err)
             print(f'Error estimate for DAO from median(err): {filtered_errest}', flush=True)
 
-            daofind_tuned = DAOStarFinder(threshold=5 * filtered_errest,
+            daofind_tuned = DAOStarFinder(threshold=3 * filtered_errest, # adjusting threshold from 5x median to 3x
                                           fwhm=fwhm_pix, roundhi=1.0, roundlo=-1.0,
                                           sharplo=0.30, sharphi=1.40)
             print("Finding stars with daofind_tuned", flush=True)
