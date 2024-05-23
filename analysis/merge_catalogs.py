@@ -598,13 +598,13 @@ def main():
                         try:
                             print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}', flush=True)
                             merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf,
-                                          fitpsf=fitpsf, target=target, basepath=basepath)
+                                          target=target, basepath=basepath)
                         except Exception as ex:
                             print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                         try:
                             print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}')
                             merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf,
-                                          fitpsf=fitpsf, target=target, basepath=basepath)
+                                          target=target, basepath=basepath)
                         except Exception as ex:
                             print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                         print(f'dao phase done.  time elapsed={time.time()-t0}')
