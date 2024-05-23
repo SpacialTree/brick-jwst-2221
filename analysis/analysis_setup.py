@@ -61,6 +61,7 @@ try:
 except ImportError:
     basepath = '/blue/adamginsburg/adamginsburg/jwst/cloudc/'
 target = 'cloudc'
+field = '002'
 
 sys.path.append(f'{basepath}/analysis/')
 sys.path.append(f'{basepath}/reduction/')

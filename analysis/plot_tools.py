@@ -42,7 +42,7 @@ filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 
 sqgrid = strategies.SquareStrategy()
 rectgrid = strategies.RectangularStrategy()
-
+basepath_brick = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 mist = Table.read(f'{basepath_brick}/isochrones/MIST_iso_633a08f2d8bb1.iso.cmd', header_start=12, data_start=13, format='ascii', delimiter=' ', comment='#')
 # Hack, but good enough to first order
 mist['410M405'] = mist['F410M']
