@@ -231,6 +231,9 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         # it in production code down the line...
         # OH, I think the FITS file turns "True" into "False"?
         # Yes, specifically: it DROPS masked data types, converting "masked" into "True"?
+        for colname in basetable.colnames:    # Adding to try to fix FITS file turning "masked" into True
+            if basetable[colname].dtype == 'bool':
+                basetable[colname][basetable[colname].mask] = False
         basetable.write(f"{tablename}.fits", overwrite=True)
         print(f"Done writing table {tablename}.fits in {time.time()-t0:0.1f} seconds")
 
@@ -407,7 +410,7 @@ def flag_near_saturated(cat, filtername, radius=None, target='brick',
                   }[filtername]
 
     idx_cat, idx_sat, sep, _ = satstar_coords.search_around_sky(cat_coords, radius)
-    good_match = sep < radius # trying to fix too many near saturated stars issue
+    good_match = np.abs(sep) < radius # trying to fix too many near saturated stars issue
 
     near_sat = np.zeros(len(cat), dtype='bool')
     near_sat[idx_cat[good_match]] = True # trying to fix too many near saturated stars issue
