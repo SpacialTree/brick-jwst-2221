@@ -407,9 +407,10 @@ def flag_near_saturated(cat, filtername, radius=None, target='brick',
                   }[filtername]
 
     idx_cat, idx_sat, sep, _ = satstar_coords.search_around_sky(cat_coords, radius)
+    good_match = sep < radius # trying to fix too many near saturated stars issue
 
     near_sat = np.zeros(len(cat), dtype='bool')
-    near_sat[idx_cat] = True
+    near_sat[idx_cat[good_match]] = True # trying to fix too many near saturated stars issue
 
     cat.add_column(near_sat, name=f'near_saturated_{filtername}')
 
