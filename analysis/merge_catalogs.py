@@ -232,8 +232,11 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         # OH, I think the FITS file turns "True" into "False"?
         # Yes, specifically: it DROPS masked data types, converting "masked" into "True"?
         for colname in basetable.colnames:    # Adding to try to fix FITS file turning "masked" into True
-            if basetable[colname].dtype == 'bool':
-                basetable[colname][basetable[colname].mask] = False
+            try:  
+                if basetable[colname].dtype.name == 'bool':
+                    basetable[colname][basetable[colname].mask] = False
+            except:
+                print('no dtype')
         basetable.write(f"{tablename}.fits", overwrite=True)
         print(f"Done writing table {tablename}.fits in {time.time()-t0:0.1f} seconds")
 
