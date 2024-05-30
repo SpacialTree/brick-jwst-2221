@@ -375,6 +375,12 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             check_wcs(member['expname'].replace('destreak', 'i2d'))
         check_wcs(asn_data['products'][0]['name'] + "_i2d.fits")
 
+        if do_destreak:
+            print("Copying nodestreak file.")
+            dodestreak_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}.fits'
+            shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
+                    dodestreak_filename)
+
         print(f"Realigning to VVV (module={module}, filter={filtername})")
         realigned_vvv_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}_realigned-to-vvv.fits'
         shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
@@ -498,6 +504,12 @@ def main(filtername, module, Observations=None, regionname='brick', do_destreak=
             output_dir=output_dir,
             save_results=True)
         print(f"DONE running Image3Pipeline {asn_file_merged}.  This should have produced file {asn_data['products'][0]['name']}_i2d.fits")
+
+        if do_destreak:
+            print("Copying nodestreak file.")
+            dodestreak_filename = f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}{destreak_suffix}.fits'
+            shutil.copy(f'{basepath}/{filtername.upper()}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_clear-{filtername.lower()}-{module}_i2d.fits',
+                    dodestreak_filename)
 
         print("After tweakreg step, checking WCS headers:")
         for member in asn_data['products'][0]['members']:
