@@ -300,7 +300,8 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
             pupil = 'clear'
 
-            filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d.fits'
+            filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d_unsatstar.fits' # trying on unsatstar
+            #filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d.fits'
             if not os.path.exists(filename):
                 filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_realigned-to-refcat.fits'
             if not os.path.exists(filename):
@@ -737,7 +738,8 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
                 phot = PSFPhotometry(finder=daofind_tuned,#finder_maker(),
                                      #grouper=grouper,
-                                     localbkg_estimator=None, # must be none or it un-saturates pixels
+                                     #localbkg_estimator=None, # must be none or it un-saturates pixels
+                                     localbkg_estimator=MMMBackground(),
                                      psf_model=dao_psf_model,
                                      fitter=LevMarLSQFitter(),
                                      fit_shape=(5, 5),
