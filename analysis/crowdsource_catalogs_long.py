@@ -542,7 +542,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
     # Load PSF model
     grid, psf_model = get_psf_model(filtername, proposal_id, field,
                                     use_webbpsf=False, use_grid=False,
-                                    basepath='/blue/adamginsburg/adamginsburg/jwst/brick/')
+                                    basepath=basepath)#'/blue/adamginsburg/adamginsburg/jwst/brick/')
     dao_psf_model = grid
     psf_model_blur = psf_model
 
@@ -563,7 +563,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
     filtered_errest = np.nanmedian(err)
     print(f'Error estimate for DAO from median(err): {filtered_errest}', flush=True)
 
-    daofind_tuned = DAOStarFinder(threshold=5 * filtered_errest,
+    daofind_tuned = DAOStarFinder(threshold=3 * filtered_errest, # adjusting threshold from 5x median to 3x
                                   fwhm=fwhm_pix, roundhi=1.0, roundlo=-1.0,
                                   sharplo=0.30, sharphi=1.40)
     print("Finding stars with daofind_tuned", flush=True)
@@ -815,7 +815,8 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
 
         phot = PSFPhotometry(finder=daofind_tuned,#finder_maker(),
                              #grouper=grouper,
-                             localbkg_estimator=None, # must be none or it un-saturates pixels
+                             #localbkg_estimator=None, # must be none or it un-saturates pixels
+                             localbkg_estimator=LocalBackground(5, 15),
                              psf_model=dao_psf_model,
                              fitter=LevMarLSQFitter(),
                              fit_shape=(5, 5),
