@@ -84,6 +84,30 @@ sbatch --job-name=brick-realignmerge --output=brick-realignmerge-%j.log --accoun
 sbatch --job-name=brick-runnotebooks --output=brick-notebooks-%j.log --account=astronomy-dept --qos=astronomy-dept-b --ntasks=8 --nodes=1 --mem=128gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/ipython /blue/adamginsburg/adamginsburg/jwst/brick/reduction/run_notebook.py"
 ```
 
+Cloud C Pipeline:
+```
+sbatch --job-name=webb-long-pipeF187N --output=webb-long-pipeline-F187N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F187N --field=002"
+sbatch --job-name=webb-long-pipeF182M --output=webb-long-pipeline-F182M-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F182M --field=002"
+sbatch --job-name=webb-long-pipeF212N --output=webb-long-pipeline-F212N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F212N --field=002"
+sbatch --job-name=webb-long-pipeF405N --output=webb-long-pipeline-F405N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F405N --field=002"
+sbatch --job-name=webb-long-pipeF410M --output=webb-long-pipeline-F410M-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F410M --field=002"
+sbatch --job-name=webb-long-pipeF466N --output=webb-long-pipeline-F466N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F466N --field=002"
+```
+
+Cloud C Pipeline No-destreak:
+```
+sbatch --job-name=webb-long-pipeF187N --output=webb-long-pipeline-F187N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F187N --field=002 --no_destreak"
+sbatch --job-name=webb-long-pipeF182M --output=webb-long-pipeline-F182M-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F182M --field=002 --no_destreak"
+sbatch --job-name=webb-long-pipeF212N --output=webb-long-pipeline-F212N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F212N --field=002 --no_destreak"
+sbatch --job-name=webb-long-pipeF405N --output=webb-long-pipeline-F405N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F405N --field=002 --no_destreak"
+sbatch --job-name=webb-long-pipeF410M --output=webb-long-pipeline-F410M-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F410M --field=002 --no_destreak"
+sbatch --job-name=webb-long-pipeF466N --output=webb-long-pipeline-F466N-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/code/brick-jwst-2221/reduction/PipelineRerunNIRCAM-LONG.py --filternames=F466N --field=002 --no_destreak"
+```
+
+Cloud C MedianFilterBackground
+```
+sbatch --job-name=make-medfiltbkgd --output=make-medfiltbkgd-%j.log --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=64gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/reduction/brick-jwst-2221/reduction/make_medfiltbkgd.py"
+```
 
 ## Cataloging
 
@@ -97,6 +121,16 @@ sbatch --job-name=webb-cat-F410M --output=web-cat-F410M%j.log  --account=adamgin
 sbatch --job-name=webb-cat-F466N --output=web-cat-F466N%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F466N"
 ```
 
+Cloud C merged (crowdsource+daophot):
+```
+sbatch --job-name=webb-cat-F405N --output=web-cat-F405N%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F405N --field=002 --target=cloudc --daophot --modules=merged"
+sbatch --job-name=webb-cat-F410M --output=web-cat-F410M%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F410M --field=002 --target=cloudc --daophot --modules=merged"
+sbatch --job-name=webb-cat-F466N --output=web-cat-F466N%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F466N --field=002 --target=cloudc --daophot --modules=merged"
+sbatch --job-name=webb-cat-F212N --output=web-cat-F212N%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F212N --field=002 --target=cloudc --daophot --modules=merged"
+sbatch --job-name=webb-cat-F182M --output=web-cat-F182M%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F182M --field=002 --target=cloudc --daophot --modules=merged"
+sbatch --job-name=webb-cat-F187N --output=web-cat-F187N%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F187N --field=002 --target=cloudc --daophot --modules=merged"
+```
+
 Bigger groups:
 ```
 sbatch --job-name=webb-cat-long --output=web-cat-long%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py"
@@ -108,6 +142,11 @@ Merge (crossmatch) the catalogs (this means merge different filters - this doesn
 sbatch --job-name=webb-cat-merge --output=web-cat-merge%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=16 --nodes=1 --mem=64gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/merge_catalogs.py"
 ```
 
+Merge the merged module catalogs for Cloud C:
+```
+sbatch --job-name=webb-cat-merge --output=web-cat-merge%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=4 --nodes=1 --mem=64gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /blue/adamginsburg/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/merge_catalogs.py --target=cloudc --modules=merged"
+```
+
 With extra options:
 ```
 sbatch --job-name=webb-cat-F405N-a --output=web-cat-F405N-a%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F405N --modules=nrca --desaturated=False"
@@ -115,6 +154,26 @@ sbatch --job-name=webb-cat-F410M-a --output=web-cat-F410M-a%j.log  --account=ada
 sbatch --job-name=webb-cat-F410M-b --output=web-cat-F410M-b%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F410M --modules=nrcb"
 sbatch --job-name=webb-cat-F466N-a --output=web-cat-F466N-a%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F466N --modules=nrca --desaturated=False"
 sbatch --job-name=webb-cat-F466N-a --output=web-cat-F466N-a%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F466N --modules=nrca"
+```
+
+Cloud C merged (JUST crowdsource):
+```
+sbatch --job-name=webb-cat-F405N --output=web-cat-F405N_cs%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F405N --field=002 --target=cloudc --modules=merged"
+sbatch --job-name=webb-cat-F410M --output=web-cat-F410M_cs%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F410M --field=002 --target=cloudc --modules=merged"
+sbatch --job-name=webb-cat-F466N --output=web-cat-F466N_cs%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F466N --field=002 --target=cloudc --modules=merged"
+sbatch --job-name=webb-cat-F212N --output=web-cat-F212N_cs%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F212N --field=002 --target=cloudc --modules=merged"
+sbatch --job-name=webb-cat-F182M --output=web-cat-F182M_cs%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F182M --field=002 --target=cloudc --modules=merged"
+sbatch --job-name=webb-cat-F187N --output=web-cat-F187N_cs%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F187N --field=002 --target=cloudc --modules=merged"
+```
+
+Cloud C merged (JUST daophot):
+```
+sbatch --job-name=webb-cat-F405N --output=web-cat-F405N-dao%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F405N --field=002 --target=cloudc --daophot --skip-crowdsource --modules=merged"
+sbatch --job-name=webb-cat-F410M --output=web-cat-F410M-dao%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F410M --field=002 --target=cloudc --daophot --skip-crowdsource --modules=merged"
+sbatch --job-name=webb-cat-F466N --output=web-cat-F466N-dao%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F466N --field=002 --target=cloudc --daophot --skip-crowdsource --modules=merged"
+sbatch --job-name=webb-cat-F212N --output=web-cat-F212N-dao%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F212N --field=002 --target=cloudc --daophot --skip-crowdsource --modules=merged"
+sbatch --job-name=webb-cat-F182M --output=web-cat-F182M-dao%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F182M --field=002 --target=cloudc --daophot --skip-crowdsource --modules=merged"
+sbatch --job-name=webb-cat-F187N --output=web-cat-F187N-dao%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python39/bin/python /orange/adamginsburg/jwst/cloudc/cloudc-jwst-2221/analysis/crowdsource_catalogs_long.py --filternames=F187N --field=002 --target=cloudc --daophot --skip-crowdsource --modules=merged"
 ```
 
 Desaturated:
