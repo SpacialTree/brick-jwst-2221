@@ -164,11 +164,12 @@ def catalog_zoom_diagnostic(data, modsky, zoomcut, stars):
                                                    min_cut=0), cmap='gray')
     pl.xticks([]); pl.yticks([]); pl.title("fit_im model+sky")
     pl.colorbar(mappable=im)
-    im = pl.subplot(2,2,3).imshow((data-modsky)[zoomcut],
-                                  norm=simple_norm((data-modsky)[zoomcut],
-                                                   stretch='asinh',
-                                                   max_percent=99.5,
-                                                   min_percent=0.5),
+    resid = (data[zoomcut]-modsky[zoomcut])
+    norm = (simple_norm(resid, stretch='asinh', max_percent=99.5, min_percent=0.5)
+            if np.nanmin(resid) > 0 else
+            simple_norm(resid, stretch='log', max_percent=99.5, min_cut=0))
+    im = pl.subplot(2,2,3).imshow(resid,
+                                  norm=norm,
                                   cmap='gray')
     pl.xticks([]); pl.yticks([]); pl.title("data-modsky")
     pl.colorbar(mappable=im)
@@ -177,12 +178,39 @@ def catalog_zoom_diagnostic(data, modsky, zoomcut, stars):
                                                    stretch='log',
                                                    max_percent=99.95,
                                                    min_cut=0), cmap='gray')
+
+    if 'qf' in stars:
+        # used in analysis
+        qgood = ((stars['qf'] > 0.6) &
+                 (stars['spread_model'] < 0.25) &
+                 (stars['fracflux'] > 0.8)
+                )
+    elif 'qfit' in stars:
+        # guesses, no tests don
+        qgood = ((stars['qfit'] < 2) &
+                 (stars['cfit'] < 0.1) &
+                 (stars['flags'] == 0))
+    else:
+        qgood = np.ones(len(stars), dtype='bool')
+
     axlims = pl.axis()
     if zoomcut[0].start:
-        pl.axis([0,zoomcut[0].stop-zoomcut[0].start, 0, zoomcut[1].stop-zoomcut[1].start])
-        pl.subplot(2,2,4).scatter(stars['x']-zoomcut[1].start, stars['y']-zoomcut[0].start, marker='x', color='r', s=8, linewidth=0.5)
+        #pl.axis([0,zoomcut[0].stop-zoomcut[0].start, 0, zoomcut[1].stop-zoomcut[1].start])
+        ok = ((stars['x'] >= zoomcut[1].start) &
+              (stars['x'] <= zoomcut[1].stop) &
+              (stars['y'] >= zoomcut[0].start) &
+              (stars['y'] <= zoomcut[0].stop))
+        pl.subplot(2,2,4).scatter(stars['x'][ok & ~qgood]-zoomcut[1].start,
+                                  stars['y'][ok & ~qgood]-zoomcut[0].start,
+                                  marker='x', color='r', s=8, linewidth=0.5)
+        pl.subplot(2,2,4).scatter(stars['x'][ok & qgood]-zoomcut[1].start,
+                                  stars['y'][ok & qgood]-zoomcut[0].start,
+                                  marker='+', color='g', s=8, linewidth=0.5)
     else:
-        pl.subplot(2,2,4).scatter(stars['x'], stars['y'], marker='x', color='r', s=5, linewidth=0.5)
+        pl.subplot(2,2,4).scatter(stars['x'][~qgood],
+                                  stars['y'][~qgood], marker='x', color='r', s=5, linewidth=0.5)
+        pl.subplot(2,2,4).scatter(stars['x'][qgood],
+                                  stars['y'][qgood], marker='+', color='g', s=5, linewidth=0.5)
     pl.axis(axlims)
     pl.xticks([]); pl.yticks([]); pl.title("Data with stars");
     pl.colorbar(mappable=im)
@@ -192,8 +220,11 @@ def save_crowdsource_results(results, ww, filename, suffix,
                              im1, detector,
                              basepath, filtername, module, desat, bgsub, exposure_,
                              psf=None,
+                             blur=False,
                              fpsf=""):
-    print(f"Saving crowdsource results.  filename={filename}, suffix={suffix}, filtername={filtername}, module={module}, desat={desat}, bgsub={bgsub}, fpsf={fpsf}")
+    print(f"Saving crowdsource results.")
+    blur_ = "_blur" if blur else ""
+
     stars, modsky, skymsky, psf_ = results
     stars = Table(stars)
     # crowdsource explicitly inverts x & y from the numpy convention:
@@ -209,8 +240,11 @@ def save_crowdsource_results(results, ww, filename, suffix,
 
 
     tblfilename = (f"{basepath}/{filtername}/"
-                    f"{filtername.lower()}_{module}{exposure_}{desat}{bgsub}{fpsf}"
+                    f"{filtername.lower()}_{module}{exposure_}{desat}{bgsub}{fpsf}{blur_}"
                     f"_crowdsource_{suffix}.fits")
+
+    print("tblfilename={tblfilename}, filename={filename}, suffix={suffix}, filtername={filtername}, module={module}, desat={desat}, bgsub={bgsub}, fpsf={fpsf} blur={blur}")
+
     stars.write(tblfilename, overwrite=True)
     # add WCS-containing header
     with fits.open(tblfilename, mode='update', output_verify='fix') as fh:
@@ -220,13 +254,13 @@ def save_crowdsource_results(results, ww, filename, suffix,
     # PSF doesn't need saving / can't be saved, it's a function
     #psfhdu = fits.ImageHDU(data=psf)
     hdul = fits.HDUList([skymskyhdu, modskyhdu])
-    hdul.writeto(f"{basepath}/{filtername}/{filtername.lower()}_{module}{exposure_}{desat}{bgsub}{fpsf}_crowdsource_skymodel_{suffix}.fits", overwrite=True)
+    hdul.writeto(f"{basepath}/{filtername}/{filtername.lower()}_{module}{exposure_}{desat}{bgsub}{fpsf}{blur_}_crowdsource_skymodel_{suffix}.fits", overwrite=True)
 
     if psf is not None:
         if hasattr(psf, 'stamp'):
             psfhdu = fits.PrimaryHDU(data=psf.stamp)
             psf_fn = (f"{basepath}/{filtername}/"
-                    f"{filtername.lower()}_{module}{exposure_}{desat}{bgsub}{fpsf}"
+                    f"{filtername.lower()}_{module}{exposure_}{desat}{bgsub}{fpsf}{blur_}"
                     f"_crowdsource_{suffix}_psf.fits")
             psfhdu.writeto(psf_fn, overwrite=True)
         else:
@@ -253,10 +287,13 @@ def load_data(filename):
 
 def get_psf_model(filtername, proposal_id, field, use_webbpsf=False,
                   use_grid=False,
+                  blur=False,
                   basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     """
     Return two types of PSF model, the first for DAOPhot and the second for Crowdsource
     """
+
+    blur_ = "_blur" if blur else ""
 
     # psf_fn = f'{basepath}/{instrument.lower()}_{filtername}_samp{oversample}_nspsf{npsf}_npix{fov_pixels}.fits'
     # if os.path.exists(str(psf_fn)):
@@ -330,7 +367,7 @@ def get_psf_model(filtername, proposal_id, field, use_webbpsf=False,
             return grid, psf_model
     else:
 
-        grid = psfgrid = to_griddedpsfmodel(f'{basepath}/psfs/{filtername.upper()}_{proposal_id}_{field}_merged_PSFgrid_oversample1_blur.fits')
+        grid = psfgrid = to_griddedpsfmodel(f'{basepath}/psfs/{filtername.upper()}_{proposal_id}_{field}_merged_PSFgrid_oversample1{blur_}.fits')
 
         # if isinstance(grid, list):
         #     print(f"Grid is a list: {grid}")
@@ -340,7 +377,6 @@ def get_psf_model(filtername, proposal_id, field, use_webbpsf=False,
 
         psf_model = WrappedPSFModel(grid)
         dao_psf_model = grid
-        psf_model_blur = psf_model
 
         return grid, psf_model
 
@@ -417,6 +453,10 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                     default=False,
                     action='store_true',
                     help="try to make & use an ePSF?", metavar="epsf")
+    parser.add_option("--blur", dest="blur",
+                    default=False,
+                    action='store_true',
+                    help="blur the PSF?", metavar="blur")
     parser.add_option("--proposal_id", dest="proposal_id",
                     default='2221',
                     help="proposal_id", metavar="proposal_id")
@@ -476,7 +516,8 @@ def get_filenames(basepath, filtername, proposal_id, field, each_suffix, pupil='
 def get_filename(basepath, filtername, proposal_id, field, module, options, pupil='clear'):
     desat = '_unsatstar' if options.desaturated else ''
     bgsub = '_bgsub' if options.bgsub else ''
-    epsf_ = "_epsf" if options.epsf else ""
+    #epsf_ = "_epsf" if options.epsf else ""
+    #blur_ = "_blur" if options.blur else ""
 
     filename = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}_i2d.fits'
     if not os.path.exists(filename):
@@ -518,6 +559,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
     bgsub = '_bgsub' if options.bgsub else ''
     epsf_ = "_epsf" if options.epsf else ""
     exposure_ = f'_exp{exposurenumber:05d}' if exposurenumber is not None else ''
+    blur_ = "_blur" if options.blur else ""
 
     print(f"Starting cataloging on {filename}", flush=True)
     fh, im1, data, wht, err, instrument, telescope, obsdate = load_data(filename)
@@ -542,9 +584,9 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
     # Load PSF model
     grid, psf_model = get_psf_model(filtername, proposal_id, field,
                                     use_webbpsf=False, use_grid=False,
+                                    blur=options.blur,
                                     basepath=basepath)#'/blue/adamginsburg/adamginsburg/jwst/brick/')
     dao_psf_model = grid
-    psf_model_blur = psf_model
 
     dq, weight, bad = get_uncertainty(err, data, wht=wht)
 
@@ -636,6 +678,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
                                          basepath=basepath,
                                          filtername=filtername, module=module,
                                          desat=desat, bgsub=bgsub,
+                                         blur=options.blur,
                                          exposure_=exposure_,
                                          suffix="unweighted", psf=None)
 
@@ -643,102 +686,50 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
 
         try:
             catalog_zoom_diagnostic(data, modsky, nullslice, stars)
-            pl.suptitle(f"Crowdsource nsky=1 unweighted Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}")
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}_catalog_diagnostics_unweighted.png',
+            pl.suptitle(f"Crowdsource nsky=1 unweighted Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}{blur_}")
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{blur_}_catalog_diagnostics_unweighted.png',
                     bbox_inches='tight')
 
             catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-            pl.suptitle(f"Crowdsource nsky=1 unweighted Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}")
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}_catalog_diagnostics_zoom_unweighted.png',
+            pl.suptitle(f"Crowdsource nsky=1 unweighted Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{blur_}")
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{blur_}_catalog_diagnostics_zoom_unweighted.png',
                     bbox_inches='tight')
             for name, zoomcut in zoomcut_list.items():
                 catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                pl.suptitle(f"Crowdsource nsky=1 Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub} zoom {name}")
-                pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}_catalog_diagnostics_zoom{name.replace(" ","_")}_unweighted.png',
+                pl.suptitle(f"Crowdsource nsky=1 Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{blur_} zoom {name}")
+                pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{blur_}_catalog_diagnostics_zoom{name.replace(" ","_")}_unweighted.png',
                         bbox_inches='tight')
         except Exception as ex:
             print(f'FAILURE to produce catalog zoom diagnostics for module {module} and filter {filtername} for unweighted crowdsource: {ex}')
-
-        # pl.figure(figsize=(10,5))
-        # pl.subplot(1,2,1).imshow(psf_model(30,30), norm=simple_norm(psf_model(30,30), stretch='log'), cmap='cividis')
-        # pl.title("Input model")
-        # pl.subplot(1,2,2).imshow(psf(30,30), norm=simple_norm(psf(30,30), stretch='log'), cmap='cividis')
-        # pl.title("Fitted model")
-
-        # yy, xx = np.indices([61, 61], dtype=float)
-        # grid.x_0 = preg.center.x+30
-        # grid.y_0 = preg.center.y+30
-        # gpsf2 = grid(xx+preg.center.x, yy+preg.center.y)
-        # psf_model = crowdsource.psf.SimplePSF(stamp=gpsf2)
-
-        # smoothing_scale = smoothing_scales[filt.lower()]
-        # gpsf3 = convolve(gpsf2, Gaussian2DKernel(smoothing_scale))
-        # psf_model_blur = crowdsource.psf.SimplePSF(stamp=gpsf3)
 
         fig = pl.figure(0, figsize=(10,10))
         fig.clf()
         ax = fig.gca()
         im = ax.imshow(weight, norm=simple_norm(weight, stretch='log')); pl.colorbar(mappable=im);
         pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}_weights.png',
-                bbox_inches='tight')
-
-        # t0 = time.time()
-        # print("Running crowdsource fit_im with weights")
-        # results_blur  = fit_im(np.nan_to_num(data), psf_model_blur, weight=weight,
-        #                     nskyx=1, nskyy=1, refit_psf=False, verbose=True)
-        # print(f"Done with weighted, nsky=1 crowdsource. dt={time.time() - t0}")
-        # stars, modsky, skymsky, psf = results_blur
-        # stars = Table(stars)
-
-        # # crowdsource explicitly inverts x & y from the numpy convention:
-        # # https://github.com/schlafly/crowdsource/issues/11
-        # coords = ww.pixel_to_world(stars['y'], stars['x'])
-        # stars['skycoord'] = coords
-        # stars['x'], stars['y'] = stars['y'], stars['x']
-
-        # tblfilename = f"{basepath}/{filtername}/{filtername.lower()}_{module}{exposure_}{desat}{bgsub}_crowdsource.fits"
-        # stars.write(tblfilename, overwrite=True)
-        # # add WCS-containing header
-        # with fits.open(tblfilename, mode='update', output_verify='fix') as fh:
-        #     fh[0].header.update(im1[1].header)
-
-        # fits.PrimaryHDU(data=skymsky, header=im1[1].header).writeto(f"{basepath}/{filtername}/{filtername.lower()}_{module}{exposure_}{desat}{bgsub}_crowdsource_skymodel.fits", overwrite=True)
-        # fits.PrimaryHDU(data=data-modsky,
-        #                 header=im1[1].header).writeto(f"{basepath}/{filtername}/{filtername.lower()}_{module}{exposure_}{desat}{bgsub}_crowdsource_data-modsky.fits", overwrite=True)
-
-        # zoomcut = slice(128, 256), slice(128, 256)
-
-        # catalog_zoom_diagnostic(data, modsky, nullslice, stars)
-        # pl.suptitle(f"Crowdsource nsky=1 weighted Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}")
-        # pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}_catalog_diagnostics_weighted_nsky1.png',
-        #         bbox_inches='tight')
-
-        # catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-        # pl.suptitle(f"Crowdsource nsky=1 weighted Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}")
-        # pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}_catalog_diagnostics_zoom_weighted_nsky1.png',
-        #         bbox_inches='tight')
+                   bbox_inches='tight')
 
 
-
-        for refit_psf, fpsf in zip((True, False), ('_fitpsf', '')):
+        for refit_psf, fpsf in zip((False, True), ('', '_fitpsf',)):
             for nsky in (0, 1, ):
                 t0 = time.time()
                 print()
-                print(f"Running crowdsource fit_im with weights & nskyx=nskyy={nsky}")
+                print(f"Running crowdsource fit_im with weights & nskyx=nskyy={nsky} & fpsf={fpsf} & blur={blur_}")
                 print(f"data.shape={data.shape} weight_shape={weight.shape}", flush=True)
-                results_blur = fit_im(np.nan_to_num(data), psf_model_blur, weight=weight,
+                results = fit_im(np.nan_to_num(data), psf_model, weight=weight,
                                     nskyx=nsky, nskyy=nsky, refit_psf=refit_psf, verbose=True,
                                     dq=dq,
                                     **crowdsource_default_kwargs
                                     )
                 print(f"Done with weighted, refit={fpsf}, nsky={nsky} crowdsource. dt={time.time() - t0}")
-                stars, modsky, skymsky, psf = results_blur
-                stars = save_crowdsource_results(results_blur, ww, filename,
+                stars, modsky, skymsky, psf = results
+                stars = save_crowdsource_results(results, ww, filename,
                                                  im1=im1, detector=detector,
                                                  basepath=basepath,
                                                  filtername=filtername,
                                                  module=module, desat=desat,
                                                  bgsub=bgsub, fpsf=fpsf,
+                                                 blur=options.blur,
                                                  exposure_=exposure_, psf=psf
                                                  if refit_psf else None,
                                                  suffix=f"nsky{nsky}")
@@ -748,22 +739,22 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
 
                 try:
                     catalog_zoom_diagnostic(data, modsky, nullslice, stars)
-                    pl.suptitle(f"Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{fpsf} nsky={nsky} weighted")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics.png',
+                    pl.suptitle(f"Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{fpsf}{blur_} nsky={nsky} weighted")
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{fpsf}{blur_}_nsky{nsky}_weighted_catalog_diagnostics.png',
                             bbox_inches='tight')
 
                     catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                    pl.suptitle(f"Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}{fpsf} nsky={nsky} weighted")
-                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics_zoom.png',
+                    pl.suptitle(f"Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}{fpsf}{blur_} nsky={nsky} weighted")
+                    pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{fpsf}{blur_}_nsky{nsky}_weighted_catalog_diagnostics_zoom.png',
                             bbox_inches='tight')
 
                     for name, zoomcut in zoomcut_list.items():
                         catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                        pl.suptitle(f"Crowdsource nsky={nsky} weighted Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{fpsf} zoom {name}")
-                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{fpsf}_nsky{nsky}_weighted_catalog_diagnostics_zoom{name.replace(" ","_")}.png',
+                        pl.suptitle(f"Crowdsource nsky={nsky} weighted Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{fpsf}{blur_} zoom {name}")
+                        pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{fpsf}{blur_}_nsky{nsky}_weighted_catalog_diagnostics_zoom{name.replace(" ","_")}.png',
                                 bbox_inches='tight')
                 except Exception as ex:
-                    print(f'FAILURE to produce catalog zoom diagnostics for module {module} and filter {filtername} for crowdsource nsky={nsky} refitpsf={refit_psf}: {ex}')
+                    print(f'FAILURE to produce catalog zoom diagnostics for module {module} and filter {filtername} for crowdsource nsky={nsky} refitpsf={refit_psf} blur={options.blur}: {ex}')
 
 
 
@@ -805,17 +796,17 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
             pl.figure(1).clf()
             pl.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
             pl.colorbar()
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}_daophot_epsf.png',
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}_daophot_epsf.png',
                        bbox_inches='tight')
             dao_psf_model = epsf
 
             save_epsf(epsf,
-                      f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}_daophot_epsf.fits')
+                      f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}_daophot_epsf.fits')
 
 
         phot = PSFPhotometry(finder=daofind_tuned,#finder_maker(),
                              #grouper=grouper,
-                             #localbkg_estimator=None, # must be none or it un-saturates pixels
+                             # localbkg_estimator=None, # must be none or it un-saturates pixels
                              localbkg_estimator=LocalBackground(5, 15),
                              psf_model=dao_psf_model,
                              fitter=LevMarLSQFitter(),
@@ -831,7 +822,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
         print(f'len(result) = {len(result)}, len(coords) = {len(coords)}, type(result)={type(result)}', flush=True)
         result['skycoord_centroid'] = coords
         detector = "" # no detector #'s for long
-        basic_daophot_catalog_fn = f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{desat}{bgsub}{epsf_}_daophot_basic.fits"
+        basic_daophot_catalog_fn = f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{desat}{bgsub}{epsf_}{blur_}_daophot_basic.fits"
         result.write(basic_daophot_catalog_fn, overwrite=True)
         print(f"Completed BASIC photometry, and wrote out file {basic_daophot_catalog_fn}")
 
@@ -839,32 +830,32 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
         stars['x'] = stars['x_fit']
         stars['y'] = stars['y_fit']
         print("Creating BASIC residual image, using 11x11 patches")
-        modelim = phot.make_model_image(data, (11, 11), include_localbkg=False)
+        modelim = phot.make_model_image(data.shape, (11, 11), include_localbkg=False)
         residual = data - modelim
         print("Done creating BASIC residual image, using 11x11 patches")
         fits.PrimaryHDU(data=residual, header=im1[1].header).writeto(
             filename.replace(".fits", "_daophot_basic_residual.fits"),
             overwrite=True)
-        fits.PrimaryHDU(data=model, header=im1[1].header).writeto(
+        fits.PrimaryHDU(data=modelim, header=im1[1].header).writeto(
             filename.replace(".fits", "_daophot_basic_model.fits"),
             overwrite=True)
         print("Saved BASIC residual image, now making diagnostics.")
         modsky = data - residual
         try:
             catalog_zoom_diagnostic(data, modsky, nullslice, stars)
-            pl.suptitle(f"daophot basic Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}")
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}_catalog_diagnostics_daophot_basic.png',
+            pl.suptitle(f"daophot basic Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}{blur_}")
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}_catalog_diagnostics_daophot_basic.png',
                     bbox_inches='tight')
 
             catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-            pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}")
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}_catalog_diagnostics_zoom_daophot_basic.png',
+            pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}{blur_}")
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}_catalog_diagnostics_zoom_daophot_basic.png',
                     bbox_inches='tight')
 
             for name, zoomcut in zoomcut_list.items():
                 catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_} zoom {name}")
-                pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}__catalog_diagnostics_zoom_daophot_basic{name.replace(" ","_")}.png',
+                pl.suptitle(f"daophot basic Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}{blur_} zoom {name}")
+                pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}__catalog_diagnostics_zoom_daophot_basic{name.replace(" ","_")}.png',
                         bbox_inches='tight')
         except Exception as ex:
             print(f'FAILURE to produce catalog zoom diagnostics for module {module} and filter {filtername} BASIC photometry: {ex}')
@@ -910,7 +901,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
             pl.figure(1).clf()
             pl.imshow(epsf.data, norm=norm, origin='lower', cmap='viridis')
             pl.colorbar()
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}_daophot_epsf.png',
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}_daophot_epsf.png',
                        bbox_inches='tight')
             dao_psf_model = epsf
 
@@ -932,7 +923,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
         result2['skycoord_centroid'] = coords2
         print(f'len(result2) = {len(result2)}, len(coords) = {len(coords2)}', flush=True)
         result2.write(f"{basepath}/{filtername}/{filtername.lower()}"
-                      f"_{module}{detector}{desat}{bgsub}{epsf_}"
+                      f"_{module}{detector}{desat}{bgsub}{epsf_}{blur_}"
                       f"_daophot_iterative.fits", overwrite=True)
         print("Saved iterative catalog")
         stars = result2
@@ -940,32 +931,32 @@ def do_photometry_step(options, filtername, module, detector, field, basepath, f
         stars['y'] = stars['y_fit']
 
         print("Creating iterative residual")
-        modelim = phot_.make_model_image(data, (11, 11), include_localbkg=False)
+        modelim = phot_.make_model_image(data.shape, (11, 11), include_localbkg=False)
         residual = data - modelim
         print("finished iterative residual")
         fits.PrimaryHDU(data=residual, header=im1[1].header).writeto(
             filename.replace(".fits", "_daophot_iterative_residual.fits"),
             overwrite=True)
-        fits.PrimaryHDU(data=model, header=im1[1].header).writeto(
+        fits.PrimaryHDU(data=modelim, header=im1[1].header).writeto(
             filename.replace(".fits", "_daophot_iterative_model.fits"),
             overwrite=True)
         print("Saved iterative residual")
         modsky = data - residual
         try:
             catalog_zoom_diagnostic(data, modsky, nullslice, stars)
-            pl.suptitle(f"daophot iterative Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}")
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}_catalog_diagnostics_daophot_iterative.png',
+            pl.suptitle(f"daophot iterative Catalog Diagnostics zoomed {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}{blur_}")
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}_catalog_diagnostics_daophot_iterative.png',
                     bbox_inches='tight')
 
             catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-            pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}")
-            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}_catalog_diagnostics_zoom_daophot_iterative.png',
+            pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}{blur_}")
+            pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}_catalog_diagnostics_zoom_daophot_iterative.png',
                     bbox_inches='tight')
 
             for name, zoomcut in zoomcut_list.items():
                 catalog_zoom_diagnostic(data, modsky, zoomcut, stars)
-                pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_} zoom {name}")
-                pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}__catalog_diagnostics_zoom_daophot_iterative{name.replace(" ","_")}.png',
+                pl.suptitle(f"daophot iterative Catalog Diagnostics {filtername} {module}{exposure_}{desat}{bgsub}{epsf_}{blur_} zoom {name}")
+                pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}{epsf_}{blur_}__catalog_diagnostics_zoom_daophot_iterative{name.replace(" ","_")}.png',
                         bbox_inches='tight')
         except Exception as ex:
             print(f'FAILURE to produce catalog zoom diagnostics for module {module} and filter {filtername} for ITERATIVE daophot: {ex}')

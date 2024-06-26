@@ -2,15 +2,14 @@ import numpy as np
 import time
 import datetime
 import os
+import sys
 import warnings
 from astropy.io import fits
 import glob
 from photutils.background import MMMBackground, MADStdBackgroundRMS
 from photutils.aperture import CircularAperture, CircularAnnulus
 from photutils.detection import DAOStarFinder, IRAFStarFinder, find_peaks
-from photutils.psf import (DAOGroup, IntegratedGaussianPRF, extract_stars,
-                           IterativelySubtractedPSFPhotometry,
-                           BasicPSFPhotometry, EPSFBuilder)
+from photutils.psf import (IntegratedGaussianPRF, extract_stars, EPSFBuilder)
 from astropy.modeling.fitting import LevMarLSQFitter
 from astropy import stats
 from astropy.table import Table, Column, MaskedColumn
@@ -23,6 +22,9 @@ from astropy import wcs
 from astropy import table
 from astropy import units as u
 from astroquery.svo_fps import SvoFps
+
+from tqdm.auto import tqdm
+
 import pylab as pl
 pl.rcParams['figure.facecolor'] = 'w'
 pl.rcParams['image.origin'] = 'lower'
@@ -67,12 +69,41 @@ project_obsnum = {
 def getmtime(x):
     return datetime.datetime.fromtimestamp(os.path.getmtime(x)).strftime('%Y-%m-%d %H:%M:%S')
 
+def sanity_check_individual_table(tbl):
+    tbl = tbl.copy()
+    tbl.sort('flux_jy')
+    #finite_fluxes = np.isfinite(np.array(tbl['flux_jy']))
+    finite_fluxes = tbl['flux_jy'] > 0
+    wl = filtername = tbl.meta['filter']
+
+    jfilts = SvoFps.get_filter_list('JWST')
+    jfilts.add_index('filterID')
+    zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.{filtername.upper()}']['ZeroPoint'], u.Jy)
+
+    flux_jy = tbl['flux_jy'][finite_fluxes].quantity
+    abmag_tbl = tbl['mag_ab'][finite_fluxes].quantity
+
+    abmag = -2.5 * np.log10(flux_jy / zeropoint) * u.mag
+
+    # there are negative fluxes -> nan mags
+    #print(f"Maximum difference between the two tables: {np.abs(abmag-abmag_tbl).max()}")
+    print("SANITY CHECK")
+    print(f"Nanmax difference between the two tables: {np.nanmax(np.abs(abmag-abmag_tbl))}")
+    #print("NaNs: (mag, flux) ", abmag_tbl[np.isnan(abmag_tbl)], flux_jy[np.isnan(abmag_tbl)])
+
+    print(f"Max flux in tbl for {wl}: {tbl['flux'].max()};"
+          f" in jy={flux_jy.max()}; magmin={abmag_tbl.min()}={np.nanmin(abmag_tbl)}, magmax={abmag_tbl.max()}={np.nanmax(abmag_tbl)}")
+    print(f"100th brightest flux={flux_jy[-100]} abmag={abmag[-100]} abmag_tbl={abmag_tbl[-100]}")
+
 def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
                    ref_filter='f405n',
-                   epsf=False, bgsub=False, desat=False,
+                   epsf=False, bgsub=False, desat=False, blur=False,
                    max_offset=0.15*u.arcsec, target='brick',
                    basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
-    print(f'Starting merge catalogs: catalog_type: {catalog_type} module: {module} target: {target}')
+    print(f'Starting merge catalogs: catalog_type: {catalog_type} module: {module} target: {target}', flush=True)
+
+    epsf_ = "_epsf" if epsf else ""
+    blur_ = "_blur" if blur else ""
 
     basetable = [tb for tb in tbls if tb.meta['filter'] == ref_filter][0].copy()
     basetable.meta['astrometric_reference_wavelength'] = ref_filter
@@ -82,14 +113,13 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
 
     desat = "_unsatstar" if desat else ""
     bgsub = '_bgsub' if bgsub else ''
-    epsf = "_epsf" if epsf else ""
 
     reffiltercol = [ref_filter] * len(basetable)
-    print(f"Started with {len(basetable)} in filter {ref_filter}")
+    print(f"Started with {len(basetable)} in filter {ref_filter}", flush=True)
 
     # build up a reference coordinate catalog by adding in those with no matches each time
     basecrds = basetable['skycoord']
-    for tb in tbls:
+    for tb in tqdm(tbls, desc='Table Meta Loop'):
         if tb.meta['filter'] == ref_filter:
             continue
         crds = tb['skycoord']
@@ -97,8 +127,8 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         newcrds = crds[sep > max_offset]
         basecrds = SkyCoord([basecrds, newcrds])
         reffiltercol += [tb.meta['filter']] * len(newcrds)
-        print(f"Added {len(newcrds)} new sources in filter {tb.meta['filter']}")
-    print(f"Base coordinate length = {len(basecrds)}")
+        print(f"Added {len(newcrds)} new sources in filter {tb.meta['filter']}", flush=True)
+    print(f"Base coordinate length = {len(basecrds)}", flush=True)
 
     basetable = Table()
     basetable['skycoord_ref'] = basecrds
@@ -116,7 +146,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         #for colname in basetable.colnames:
         #    basetable.rename_column(colname, colname+"_"+basetable.meta['filter'])
 
-        for tbl in tbls:
+        for tbl in tqdm(tbls, desc='Table Loop'):
             t0 = time.time()
             wl = tbl.meta['filter']
             flag_near_saturated(tbl, filtername=wl, target=target, basepath=basepath)
@@ -126,7 +156,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
 
             crds = tbl['skycoord']
             matches, sep, _ = basecrds.match_to_catalog_sky(crds, nthneighbor=1)
-            print(f"filter {wl} has {len(tbl)} rows.  Matching took {time.time()-t0:0.1f} seconds")
+            print(f"filter {wl} has {len(tbl)} rows.  Matching took {time.time()-t0:0.1f} seconds", flush=True)
 
             # removed Jan 21, 2023 because this *should* be handled by the pipeline now
             # # do one iteration of bulk offset measurement
@@ -155,12 +185,16 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
                         matchtb[f'{cn}_{wl}'].meta = matchtb[cn].meta
                     matchtb.remove_column(cn)
 
+            print(f"Max flux in tbl for {wl}: {tbl['flux'].max()}; in jy={np.nanmax(np.array(tbl['flux_jy']))}; mag={np.nanmin(np.array(tbl['mag_ab']))}")
+            print(f"merging tables step: max flux for {wl} is {matchtb['flux_'+wl].max()} {matchtb['flux_jy_'+wl].max()} {matchtb['mag_ab_'+wl].min()}")
+
             basetable = table.hstack([basetable, matchtb], join_type='exact')
             meta[f'{wl[1:-1]}pxdg'.upper()] = tbl.meta['pixelscale_deg2']
             meta[f'{wl[1:-1]}pxas'.upper()] = tbl.meta['pixelscale_arcsec']
             for key in tbl.meta:
                 meta[f'{wl[1:-1]}{key[:4]}'.upper()] = tbl.meta[key]
 
+            print(f"merging tables step: max flux for {wl} in merged table is {basetable['flux_'+wl].max()} {np.nanmax(np.array(basetable['flux_jy_'+wl]))} {np.nanmin(np.array(basetable['mag_ab_'+wl]))}")
             # DEBUG
             # DEBUG if hasattr(basetable[f'{cn}_{wl}'], 'mask'):
             # DEBUG     print(f"Table has mask sum for column {cn} {basetable[cn+'_'+wl].mask.sum()}")
@@ -177,10 +211,10 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
             print(f"Flagged {tbl[f'near_saturated_{wl}'].sum()} stars that are near saturated stars "
                   f"in filter {wl} out of {len(tbl)}.  "
                   f"There are then {basetable[f'near_saturated_{wl}_{wl}'].sum()} in the merged table.  "
-                  f"There are also {basetable[f'replaced_saturated_{wl}'].sum()} replaced saturated.")
+                  f"There are also {basetable[f'replaced_saturated_{wl}'].sum()} replaced saturated.", flush=True)
 
 
-        print(f"Stacked all rows into table with len={len(basetable)}")
+        print(f"Stacked all rows into table with len={len(basetable)}", flush=True)
         zeropoint410 = u.Quantity(jfilts.loc[f'JWST/NIRCam.F410M']['ZeroPoint'], u.Jy)
         zeropoint182 = u.Quantity(jfilts.loc[f'JWST/NIRCam.F182M']['ZeroPoint'], u.Jy)
         zeropoint405 = u.Quantity(jfilts.loc[f'JWST/NIRCam.F405N']['ZeroPoint'], u.Jy)
@@ -217,14 +251,14 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         assert '212PXDG' in meta
         assert '212PXDG' in basetable.meta
 
-        tablename = f"{basepath}/catalogs/{catalog_type}_{module}_photometry_tables_merged{desat}{bgsub}{epsf}"
+        tablename = f"{basepath}/catalogs/{catalog_type}_{module}_photometry_tables_merged{desat}{bgsub}{epsf_}{blur_}"
         t0 = time.time()
-        print(f"Writing table {tablename}")
+        print(f"Writing table {tablename}", flush=True)
         # use caps b/c FITS will force it to caps anyway
         basetable.meta['VERSION'] = datetime.datetime.now().isoformat()
         # takes FOR-EV-ER
         basetable.write(f"{tablename}.ecsv", overwrite=True)
-        print(f"Done writing table {tablename}.ecsv in {time.time()-t0:0.1f} seconds")
+        print(f"Done writing table {tablename}.ecsv in {time.time()-t0:0.1f} seconds", flush=True)
         t0 = time.time()
         # DO NOT USE FITS in production, it drops critical metadata
         # I wish I had noted *what* metadata it drops, though, since I still seem to be using
@@ -238,10 +272,11 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
             except:
                 print('no dtype')
         basetable.write(f"{tablename}.fits", overwrite=True)
-        print(f"Done writing table {tablename}.fits in {time.time()-t0:0.1f} seconds")
+        print(f"Done writing table {tablename}.fits in {time.time()-t0:0.1f} seconds", flush=True)
 
 
-def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=False, fitpsf=False, target='brick',
+def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False,
+                      epsf=False, fitpsf=False, blur=False, target='brick',
                       basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     if epsf:
         raise NotImplementedError
@@ -258,14 +293,16 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
     desat = "_unsatstar" if desat else ""
     bgsub = '_bgsub' if bgsub else ''
     fitpsf = '_fitpsf' if fitpsf else ''
+    blur_ = "_blur" if blur else ""
 
     jfilts = SvoFps.get_filter_list('JWST')
     jfilts.add_index('filterID')
 
     filternames = [filn for obsid in obs_filters[target] for filn in obs_filters[target][obsid]]
+    print("Merging filters {filternames}")
     catfns = [x
               for filn in filternames
-              for x in glob.glob(f"{basepath}/{filn.upper()}/{filn.lower()}*{module}{desat}{bgsub}{fitpsf}_crowdsource{suffix}.fits")
+              for x in glob.glob(f"{basepath}/{filn.upper()}/{filn.lower()}*{module}{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits")
              ]
     if target == 'brick' and len(catfns) != 10:
         raise ValueError(f"len(catfns) = {len(catfns)}.  catfns: {catfns}")
@@ -294,46 +331,57 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False, epsf=F
             crds = tbl['skycoord']
         tbl.meta['pixelscale_deg2'] = ww.proj_plane_pixel_area()
         tbl.meta['pixelscale_arcsec'] = (ww.proj_plane_pixel_area()**0.5).to(u.arcsec)
-        print('Calculating Flux [Jy]')
-        flux_jy = (tbl['flux'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * tbl['fwhm']**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
-        eflux_jy = (tbl['dflux'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * tbl['fwhm']**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
+        print(f'Calculating Flux [Jy].  fwhm={tbl["fwhm"].mean()}, pixscale={tbl.meta["pixelscale_arcsec"]}')
+        # The 'flux' is the sum of pixels whose values are each in MJy/sr.
+        # To get to the correct flux, we need to multiply by the pixel area in steradians to get to megaJanskys, which can be summed
+        # That's it.  There's no need to account for the FWHM.  We only needed that if tbl['flux'] was the _peak_, but it's not.
+        #flux_jy = (tbl['flux'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * tbl['fwhm']**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
+        #eflux_jy = (tbl['dflux'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * tbl['fwhm']**2 * tbl.meta['pixelscale_deg2']).to(u.Jy)
+        flux_jy = (tbl['flux'] * u.MJy/u.sr * tbl.meta['pixelscale_deg2']).to(u.Jy)
+        eflux_jy = (tbl['dflux'] * u.MJy/u.sr * tbl.meta['pixelscale_deg2']).to(u.Jy)
         with np.errstate(all='ignore'):
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')
                 filtername = tbl.meta["filter"]
                 zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.{filtername.upper()}']['ZeroPoint'], u.Jy)
-                print(f"Zeropoint for {filtername} is {zeropoint}")
-                abmag = -2.5 * np.log10(flux_jy / zeropoint)
-                abmag_err = 2.5 / np.log(10) * np.abs(eflux_jy / flux_jy)
-                tbl.add_column(flux_jy, name='flux_jy')
-                tbl.add_column(eflux_jy, name='eflux_jy')
-                tbl.add_column(abmag, name='mag_ab')
-                tbl.add_column(abmag_err, name='emag_ab')
+                print(f"Zeropoint for {filtername} is {zeropoint}.  Max flux is {flux_jy.max()}")
+                abmag = -2.5 * np.log10(flux_jy / zeropoint) * u.mag
+                abmag_err = 2.5 / np.log(10) * np.abs(eflux_jy / flux_jy) * u.mag
+                tbl.add_column(Column(flux_jy, name='flux_jy', unit=u.Jy))
+                tbl.add_column(Column(eflux_jy, name='eflux_jy', unit=u.Jy))
+                tbl.add_column(Column(abmag, name='mag_ab', unit=u.mag))
+                tbl.add_column(Column(abmag_err, name='emag_ab', unit=u.mag))
+                print(f"Max flux={tbl['flux_jy'].max()}, min mag={np.nanmin(tbl['mag_ab'])}, median={np.nanmedian(tbl['mag_ab'])}")
         if hasattr(tbl['mag_ab'], 'mask'):
             print(f'ab mag tbl col has mask sum = {tbl["mag_ab"].mask.sum()} masked values')
         if hasattr(abmag, 'mask'):
             print(f'ab mag has mask sum = {abmag.mask.sum()} masked values')
         if hasattr(tbl['flux'], 'mask'):
-            print(f'ab mag has mask sum = {tbl["flux"].mask.sum()} masked values')
+            print(f'flux has mask sum = {tbl["flux"].mask.sum()} masked values')
+
+    for tbl in tbls:
+        sanity_check_individual_table(tbl)
 
     merge_catalogs(tbls,
                    catalog_type=f'crowdsource{suffix}{"_desat" if desat else ""}{"_bgsub" if bgsub else ""}',
                    module=module, bgsub=bgsub, desat=desat, epsf=epsf, target=target,
+                   blur=blur,
                    basepath=basepath)
 
 
-def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False, bgsub=False, epsf=False, target='brick',
+def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False, bgsub=False, epsf=False, blur=False, target='brick',
                   basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
 
     desat = "_unsatstar" if desat else ""
     bgsub = '_bgsub' if bgsub else ''
-    epsf = "_epsf" if epsf else ""
+    epsf_ = "_epsf" if epsf else ""
+    blur_ = "_blur" if blur else ""
 
     jfilts = SvoFps.get_filter_list('JWST')
     jfilts.add_index('filterID')
 
     catfns = daocatfns = [
-        f"{basepath}/{filtername.upper()}/{filtername.lower()}_{module}{detector}{desat}{bgsub}{epsf}_daophot_{daophot_type}.fits"
+        f"{basepath}/{filtername.upper()}/{filtername.lower()}_{module}{detector}{desat}{bgsub}{epsf_}{blur_}_daophot_{daophot_type}.fits"
         for filtername in filternames
     ]
     imgfns = [x
@@ -375,6 +423,7 @@ def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False,
         tbl.meta['fwhm_pix'] = fwhm_pix
 
         with np.errstate(all='ignore'):
+            # TODO: Is DAOPHOT fitting the peak or the sum?  I think it's the sum, in which case this is wrong...
             flux_jy = (flux * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * fwhm_arcsec**2).to(u.Jy)
             zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.{filtername.upper()}']['ZeroPoint'], u.Jy)
             abmag = -2.5 * np.log10(flux_jy / zeropoint)
@@ -389,11 +438,13 @@ def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False,
         tbl.add_column(abmag_err, name='emag_ab')
 
     merge_catalogs(tbls, catalog_type=daophot_type, module=module, bgsub=bgsub, desat=desat, epsf=epsf, target=target,
+                   blur=blur,
                    basepath=basepath)
 
 
 def flag_near_saturated(cat, filtername, radius=None, target='brick',
                         basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
+    print(f"Flagging near saturated stars for filter {filtername}")
     satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[target][filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
     satstar_cat = Table.read(satstar_cat_fn)
     satstar_coords = satstar_cat['skycoord_fit']
@@ -558,7 +609,7 @@ def main():
     from optparse import OptionParser
     parser = OptionParser()
     parser.add_option("-m", "--modules", dest="modules",
-                    default='merged,nrca,nrcb,merged-reproject',
+                    default='merged,merged-reproject',
                     help="module list", metavar="modules")
     parser.add_option("--target", dest="target",
                     default='brick',
@@ -576,47 +627,51 @@ def main():
             for bgsub in (False, True):
                 for epsf in (False, True):
                     for fitpsf in (False, True):
-                        t0 = time.time()
-                        print()
-                        print(f'crowdsource {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}. ')
-                        try:
-                            merge_crowdsource(module=module, desat=desat, bgsub=bgsub, epsf=epsf,
-                                              fitpsf=fitpsf, target=target, basepath=basepath)
-                        except Exception as ex:
-                            print(f"Living with this error: {ex}, {type(ex)}, {str(ex)}")
-                        try:
-                            print(f'crowdsource unweighted {module}', flush=True)
-                            merge_crowdsource(module=module, suffix='_unweighted', desat=desat, bgsub=bgsub, epsf=epsf,
-                                              fitpsf=fitpsf, target=target, basepath=basepath)
-                        except NotImplementedError:
-                            continue
-                        except Exception as ex:
-                            print(f"Exception for unweighted crowdsource: {ex}, {type(ex)}, {str(ex)}")
-                            #raise ex
-                        try:
-                            for suffix in ("_nsky0", "_nsky1", ):#"_nsky15"):
-                                print(f'crowdsource {suffix} {module}')
-                                merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf,
-                                                  fitpsf=fitpsf, target=target, basepath=basepath)
-                        except Exception as ex:
-                            print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
-                        print(f'crowdsource phase done.  time elapsed={time.time()-t0}')
-                        t0 = time.time()
-                        print()
-                        try:
-                            print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}', flush=True)
-                            merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf,
-                                          target=target, basepath=basepath)
-                        except Exception as ex:
-                            print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
-                        try:
-                            print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf} fitpsf={fitpsf} target={target}')
-                            merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf,
-                                          target=target, basepath=basepath)
-                        except Exception as ex:
-                            print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
-                        print(f'dao phase done.  time elapsed={time.time()-t0}')
-                        print()
+                        for blur in (False, True):
+                            t0 = time.time()
+                            print()
+                            print(f'crowdsource {module} desat={desat} bgsub={bgsub} epsf={epsf} blur={blur} fitpsf={fitpsf} target={target}. ', flush=True)
+                            try:
+                                merge_crowdsource(module=module, desat=desat, bgsub=bgsub, epsf=epsf,
+                                                  fitpsf=fitpsf, target=target, basepath=basepath, blur=blur)
+                            except Exception as ex:
+                                print(f"Living with this error: {ex}, {type(ex)}, {str(ex)}")
+                            try:
+                                print(f'crowdsource unweighted {module}', flush=True)
+                                merge_crowdsource(module=module, suffix='_unweighted', desat=desat, bgsub=bgsub, epsf=epsf,
+                                                  fitpsf=fitpsf, target=target, basepath=basepath, blur=blur)
+                            except NotImplementedError:
+                                continue
+                            except Exception as ex:
+                                print(f"Exception for unweighted crowdsource: {ex}, {type(ex)}, {str(ex)}")
+                                #raise ex
+                            try:
+                                for suffix in ("_nsky0", "_nsky1", ):#"_nsky15"):
+                                    print(f'crowdsource {suffix} {module}')
+                                    merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf,
+                                                      fitpsf=fitpsf, target=target, basepath=basepath, blur=blur)
+                            except Exception as ex:
+                                print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
+                                exc_type, exc_obj, exc_tb = sys.exc_info()
+                                print(f"Exception occurred on line {exc_tb.tb_lineno}")
+
+                            print(f'crowdsource phase done.  time elapsed={time.time()-t0}')
+                            t0 = time.time()
+                            print()
+                            try:
+                                print(f'daophot basic {module} desat={desat} bgsub={bgsub} epsf={epsf} blur={blur} fitpsf={fitpsf} target={target}', flush=True)
+                                merge_daophot(daophot_type='basic', module=module, desat=desat, bgsub=bgsub, epsf=epsf,
+                                              target=target, basepath=basepath, blur=blur)
+                            except Exception as ex:
+                                print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
+                            try:
+                                print(f'daophot iterative {module} desat={desat} bgsub={bgsub} epsf={epsf} blur={blur} fitpsf={fitpsf} target={target}')
+                                merge_daophot(daophot_type='iterative', module=module, desat=desat, bgsub=bgsub, epsf=epsf,
+                                              target=target, basepath=basepath, blur=blur)
+                            except Exception as ex:
+                                print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
+                            print(f'dao phase done.  time elapsed={time.time()-t0}')
+                            print()
 
 if __name__ == "__main__":
     main()

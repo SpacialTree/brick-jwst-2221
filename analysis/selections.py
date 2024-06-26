@@ -22,7 +22,6 @@ try:
 except ImportError:
     from photutils import CircularAperture, EPSFBuilder, find_peaks, CircularAnnulus
 from photutils.detection import DAOStarFinder, IRAFStarFinder
-from photutils.psf import DAOGroup, IntegratedGaussianPRF, extract_stars, IterativelySubtractedPSFPhotometry, BasicPSFPhotometry
 from photutils.background import MMMBackground, MADStdBackgroundRMS
 from astropy.modeling.fitting import LevMarLSQFitter
 
@@ -66,16 +65,29 @@ def main(basetable, ww):
     basetable['mag_ab_f410m'].mask[saturated_f410m] = True
     basetable['flux_f410m'].mask[saturated_f410m] = True
 
+    filternames = [basetable.meta[key] for key in basetable.meta if 'FILT' in key]
+    print(f"Selecting based on filters {filternames}")
 
     # FITS tables can't mask boolean columns
     # so, we have to mask the saturated mask using the mask on the flux for the filter
-    any_saturated_ = [basetable[f'near_saturated_{x}_{x}'] & ~basetable[f'flux_{x}'].mask for x in filternames]
+    any_saturated_ = [basetable[f'near_saturated_{x}_{x}'] &
+                      ~basetable[f'flux_{x}'].mask for x in filternames]
+    any_saturated_narrow_ = [basetable[f'near_saturated_{x}_{x}'] &
+                            ~basetable[f'flux_{x}'].mask for x in filternames
+                            if 'w' not in x.lower()
+                           ]
 
     any_saturated = any_saturated_[0]
     for col in any_saturated_[1:]:
         print(f"{col.sum()} saturated in {col.name}")
         any_saturated = any_saturated | col
     print(f"{any_saturated.sum()} near saturated out of {len(basetable)}.  That leaves {(~any_saturated).sum()} not near unsaturated")
+
+    any_saturated_narrow = any_saturated_narrow_[0]
+    for col in any_saturated_narrow_[1:]:
+        print(f"{col.sum()} saturated in {col.name}")
+        any_saturated_narrow = any_saturated_narrow | col
+    print(f"{any_saturated_narrow.sum()} near saturated out of {len(basetable)}.  That leaves {(~any_saturated_narrow).sum()} not near unsaturated")
 
     any_replaced_saturated_ = [basetable[f'replaced_saturated_{x}'] &
                                ~basetable[f'flux_{x}'].mask for x in filternames]
@@ -88,9 +100,14 @@ def main(basetable, ww):
     magerr_gtpt1 = np.logical_or.reduce([basetable[f'emag_ab_{filtername}'] > 0.2 for filtername in filternames])
     magerr_gtpt1.sum()
 
+    # crowdsource parameters
     minqf = 0.60
     maxspread = 0.25
     minfracflux = 0.8
+
+    # daophot parameters
+    max_qfit = 2
+    max_cfit = 0.1
 
     for filt in filternames:
         filt = filt.lower()
@@ -130,9 +147,20 @@ def main(basetable, ww):
     print(f"Of {len(all_good)} rows, {short_good.sum()} are good in short filters.")
     print(f"Of {len(all_good)} rows, {any_good.sum()} are good in at least one filter.")
 
-    goodqflong = ((basetable['qf_f410m'] > minqf) & (basetable['qf_f405n'] > minqf) & (basetable['qf_f466n'] > minqf))
-    goodspreadlong = ((basetable['spread_model_f410m'] < maxspread) | (basetable['spread_model_f405n'] < maxspread) | (basetable['spread_model_f466n'] < maxspread))
-    goodfracfluxlong = ((basetable['fracflux_f410m'] > minfracflux) | (basetable['fracflux_f405n'] > minfracflux) & (basetable['fracflux_f466n'] > minfracflux))
+    # crowdsource
+    if 'qf_f410m' in basetable.colnames:
+        goodqflong = ((basetable['qf_f410m'] > minqf) & (basetable['qf_f405n'] > minqf) & (basetable['qf_f466n'] > minqf))
+        goodspreadlong = ((basetable['spread_model_f410m'] < maxspread) | (basetable['spread_model_f405n'] < maxspread) | (basetable['spread_model_f466n'] < maxspread))
+        goodfracfluxlong = ((basetable['fracflux_f410m'] > minfracflux) | (basetable['fracflux_f405n'] > minfracflux) & (basetable['fracflux_f466n'] > minfracflux))
+    elif 'qfit_f410m' in basetable.colnames:
+        goodqflong = ((basetable['qfit_f410m'] < max_qfit) &
+                      (basetable['qfit_f405n'] < max_qfit) &
+                      (basetable['qfit_f466n'] < max_qfit))
+        # I'm using the same variable name to save rewriting below... this is not a great choice
+        goodspreadlong = ((basetable['cfit_f410m'] < max_cfit) |
+                          (basetable['cfit_f405n'] < max_cfit) |
+                          (basetable['cfit_f466n'] < max_cfit))
+        goodfracfluxlong = True #((basetable['fracflux_f410m'] > minfracflux) | (basetable['fracflux_f405n'] > minfracflux) & (basetable['fracflux_f466n'] > minfracflux))
 
     # masked arrays don't play nice
     goodqflong = np.array(goodqflong & ~goodqflong.mask)
@@ -288,6 +316,8 @@ def main(basetable, ww):
     print(f"Not-bad:{(~bad).sum()}, bad: {bad.sum()},"# bad.mask: {bad.mask.sum()},"
           f" len(bad):{len(bad)}, len(table):{len(basetable)}.")
 
+    for filt in filternames:
+        print(f"{filt} median mag={np.nanmedian(np.array(basetable['mag_ab_'+filt][basetable['good_'+filt]]))}")
 
     # Basic selections for CMD, CCD plotting
     sel = reg.contains(basetable['skycoord_f410m'], ww)
@@ -543,17 +573,17 @@ if __name__ == "__main__":
     #result = main(basetable_nrcb, ww=ww)
     #globals().update({key+"_b": val for key, val in result.items()})
 
-    print()
-    print("merged-reproject")
+    #print()
+    #print("merged-reproject")
     from analysis_setup import fh_merged_reproject as fh, ww410_merged_reproject as ww410, ww410_merged_reproject as ww
-    result = main(basetable_merged_reproject, ww=ww)
-    globals().update({key+"_mr": val for key, val in result.items()})
+    #result = main(basetable_merged_reproject, ww=ww)
+    #globals().update({key+"_mr": val for key, val in result.items()})
 
-    print()
-    print("merged")
+    #print()
+    #print("merged")
     from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
-    result = main(basetable_merged, ww=ww)
-    globals().update({key+"_m": val for key, val in result.items()})
+    #result = main(basetable_merged, ww=ww)
+    #globals().update({key+"_m": val for key, val in result.items()})
 
     #if options.module == 'nrca':
     #    from analysis_setup import fh_nrca as fh, ww410_nrca as ww410, ww410_nrca as ww
@@ -571,6 +601,7 @@ if __name__ == "__main__":
     print(options.module)
     if options.module == 'merged':
         from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged = basetable = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged_photometry_tables_merged.fits')
         result = main(basetable_merged, ww=ww)
         globals().update(result)
         basetable = basetable_merged
@@ -581,8 +612,34 @@ if __name__ == "__main__":
         globals().update(result)
         basetable = basetable_merged1182
         print("Loaded merged1182")
+    elif options.module == 'merged1182_blur':
+        from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182_blur = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged_photometry_tables_merged_blur.fits')
+        result = main(basetable_merged1182_blur, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged1182_blur
+        print("Loaded merged1182_blur")
+
+    elif options.module == 'merged1182_daophot':
+        from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182_daophot = Table.read(f'{basepath}/catalogs/iterative_merged_photometry_tables_merged.fits')
+        result = main(basetable_merged1182_daophot, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged1182_daophot
+        print("Loaded merged1182_daophot")
+
+    elif options.module == 'merged1182_daophot_blur':
+        from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182_daophot_blur = Table.read(f'{basepath}/catalogs/iterative_merged_photometry_tables_merged_blur.fits')
+        result = main(basetable_merged1182_daophot_blur, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged1182_daophot_blur
+        print("Loaded merged1182_daophot")
+
+
     elif options.module == 'merged-reproject':
         from analysis_setup import fh_merged_reproject as fh, ww410_merged_reproject as ww410, ww410_merged_reproject as ww
+        basetable_merged_reproject = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged-reproject_photometry_tables_merged_20231003.fits')
         result = main(basetable_merged_reproject, ww=ww)
         globals().update(result)
         basetable = basetable_merged_reproject
