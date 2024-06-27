@@ -14,7 +14,7 @@ from astropy import wcs
 from astropy import table
 from astropy import units as u
 from astroquery.svo_fps import SvoFps
-
+blur=options.blur,
 try:
     from photutils.apeture import CircularAnnulus, CircularAperture
     from photutils.psf import EPSFBuilder
@@ -44,8 +44,8 @@ from astropy import units as u
 
 from analysis_setup import (basepath, reg, regzoom, distance_modulus,
                             filternames, basetable, plot_tools, basetable,
-                            basetable_merged_reproject,
-                            basetable_merged,
+                            #basetable_merged_reproject,
+                            #basetable_merged,
                             #basetable_merged1182,
                             #basetable_nrca, basetable_nrcb,
                             #basetable_merged_reproject_dao_iter_bg_epsf ,
