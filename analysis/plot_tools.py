@@ -39,6 +39,7 @@ from filtering import get_fwhm
 from jwst.datamodels import ImageModel
 
 filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
+all_filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m', 'f444w', 'f356w', 'f200w', 'f115w']
 
 sqgrid = strategies.SquareStrategy()
 rectgrid = strategies.RectangularStrategy()
@@ -466,12 +467,10 @@ def xmatch_plot(basetable, ref_filter='f405n', filternames=filternames,
 
     basecrds = basetable[f'skycoord_{ref_filter}']
 
-    refhdr = fits.getheader(f'{basepath}/{ref_filter.upper()}/pipeline/jw02221-o{obsid}_t001_nircam_clear-{ref_filter}-{module}_i2d.fits')
-    # refwcs = WCS(refhdr)
-    im = ImageModel(f'{basepath}/{ref_filter.upper()}/pipeline/jw02221-o{obsid}_t001_nircam_clear-{ref_filter}-{module}_i2d.fits')
-    refwcs = im.get_fits_wcs()
+    refhdr = fits.getheader(f'{basepath}/{ref_filter.upper()}/pipeline/jw02221-o{obsid}_t001_nircam_clear-{ref_filter}-merged_i2d.fits', ext=('SCI', 1))
+    refwcs = WCS(refhdr)
 
-    gridspec = sqgrid.get_grid(5)
+    gridspec = sqgrid.get_grid(len(filternames)-1)
     ii = 0
 
     for filtername in filternames:
