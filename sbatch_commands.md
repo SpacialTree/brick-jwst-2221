@@ -140,6 +140,9 @@ sbatch --job-name=webb-cat-long --output=web-cat-long%j.log  --account=adamginsb
 Merge (crossmatch) the catalogs (this means merge different filters - this doesn't merge nrca+nrcb) = merge catalogs:
 ```
 sbatch --job-name=webb-cat-merge --output=web-cat-merge%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=16 --nodes=1 --mem=64gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/merge_catalogs.py"
+
+sbatch --job-name=webb-cat-merge-daophot --output=web-cat-merge-daophot%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=16 --nodes=1 --mem=64gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/merge_catalogs.py --skip-crowdsource"
+sbatch --job-name=webb-cat-merge-crowdsource --output=web-cat-merge-crowdsource%j.log  --account=adamginsburg --qos=adamginsburg-b --ntasks=16 --nodes=1 --mem=64gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/merge_catalogs.py --skip-daophot"
 ```
 
 Merge the merged module catalogs for Cloud C:
@@ -339,6 +342,25 @@ sbatch --job-name=webb-cat-F466Nmrgblur --output=web-cat-F466N-mrgblur%j.log  --
 sbatch --job-name=webb-cat-F187Nmrgblur --output=web-cat-F187N-mrgblur%j.log  --account=astronomy-dept --qos=astronomy-dept-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F187N --modules=merged --blur --daophot"
 sbatch --job-name=webb-cat-F182Mmrgblur --output=web-cat-F182M-mrgblur%j.log  --account=astronomy-dept --qos=astronomy-dept-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F182M --modules=merged --blur --daophot"
 sbatch --job-name=webb-cat-F212Nmrgblur --output=web-cat-F212N-mrgblur%j.log  --account=astronomy-dept --qos=astronomy-dept-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=F212N --modules=merged --blur --daophot"
+
+bash run_all (daophot):
+
+for filter in F115W F200W F356W F444W; do
+    for blur in " " "--blur"; do
+        for bgsub in " " "--bgsub"; do
+            sbatch --job-name=webb-cat-${filter}mrg${blur:2}${bgsub:2} --output=web-cat-${filter}-mrg${blur:2}${bgsub:2}%j.log  --account=astronomy-dept --qos=astronomy-dept-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=${filter} --proposal_id=1182 --modules=merged $blur $bgsub --daophot --skip-crowdsource"
+        done
+    done
+done
+
+for filter in F212N F182M F187N F410M F405N F466N; do
+    for blur in " " "--blur"; do
+        for bgsub in " " "--bgsub"; do
+            sbatch --job-name=webb-cat-${filter}mrg${blur:2}${bgsub:2} --output=web-cat-${filter}-mrg${blur:2}${bgsub:2}%j.log  --account=astronomy-dept --qos=astronomy-dept-b --ntasks=8 --nodes=1 --mem=256gb --time=96:00:00 --wrap "/blue/adamginsburg/adamginsburg/miniconda3/envs/python310/bin/python /blue/adamginsburg/adamginsburg/jwst/brick/analysis/crowdsource_catalogs_long.py --filternames=${filter} --modules=merged $blur $bgsub --daophot --skip-crowdsource"
+        done
+    done
+done
+
 ```
 
 For 1182:

@@ -16,7 +16,7 @@ from astropy import units as u
 from astroquery.svo_fps import SvoFps
 blur=options.blur,
 try:
-    from photutils.apeture import CircularAnnulus, CircularAperture
+    from photutils.aperture import CircularAnnulus, CircularAperture
     from photutils.psf import EPSFBuilder
     from photutils.detection import find_peaks
 except ImportError:
@@ -43,7 +43,8 @@ from astropy.table import Table
 from astropy import units as u
 
 from analysis_setup import (basepath, reg, regzoom, distance_modulus,
-                            filternames, basetable, plot_tools, basetable,
+                            filternames, plot_tools,
+                            # basetable,
                             #basetable_merged_reproject,
                             #basetable_merged,
                             #basetable_merged1182,
@@ -106,37 +107,46 @@ def main(basetable, ww):
     minfracflux = 0.8
 
     # daophot parameters
-    max_qfit = 2
+    max_qfit = 0.4
     max_cfit = 0.1
 
     for filt in filternames:
         filt = filt.lower()
         mask = basetable[f'mag_ab_{filt}'].mask
-        # this qf threshold can be pretty stringent; 0.98 drops the number of sources a lot
-        # Eddie Schlafly recommended "For unsaturated sources, I'd be deeply
-        # skeptical of anything with qf < 0.6 or so; the suggestion is that we're
-        # on the edge of a chip or a bad region and don't even have the peak on a
-        # good pixel. I'd put tighter bounds if I wanted very good photometry, more
-        # like 90-95%."
-        # qf > 0.6 looks pretty decent so I'm rollin with it
-        qfok = ((basetable[f'qf_{filt}'] > minqf).data & (~(basetable[f'qf_{filt}']).mask))
-        qfmask = basetable[f'qf_{filt}'].mask
-        # it's not very clear what the spread model does; Schafly points to
-        # https://sextractor.readthedocs.io/en/latest/Model.html#model-based-star-galaxy-separation-spread-model
-        # it may be useful for IDing extended sources
-        spok = ((np.abs(basetable[f'spread_model_{filt}']) < maxspread) &
-                (~basetable[f'spread_model_{filt}'].mask))
-        # fracflux is intended to be a measure of how blended the source is. It's
-        # the PSF-weighted flux of the stamp after subtracting neighbors, divided
-        # by the PSF-weighted flux of the full image including neighbors. So if you
-        # have no neighbors around, it's 1. If typically half the flux in one of
-        # your pixels is from your neighbors, it's 0.5, where 'typically' is in a
-        # PSF-weighted sense.
-        ffok = ((basetable[f'fracflux_{filt}'] > minfracflux) & (~basetable[f'fracflux_{filt}'].mask))
+
+        if f'qf_{filt}' in basetable.colnames:
+            # this qf threshold can be pretty stringent; 0.98 drops the number of sources a lot
+            # Eddie Schlafly recommended "For unsaturated sources, I'd be deeply
+            # skeptical of anything with qf < 0.6 or so; the suggestion is that we're
+            # on the edge of a chip or a bad region and don't even have the peak on a
+            # good pixel. I'd put tighter bounds if I wanted very good photometry, more
+            # like 90-95%."
+            # qf > 0.6 looks pretty decent so I'm rollin with it
+            qfok = ((basetable[f'qf_{filt}'] > minqf).data & (~(basetable[f'qf_{filt}']).mask))
+            qfmask = basetable[f'qf_{filt}'].mask
+            # it's not very clear what the spread model does; Schafly points to
+            # https://sextractor.readthedocs.io/en/latest/Model.html#model-based-star-galaxy-separation-spread-model
+            # it may be useful for IDing extended sources
+            spok = ((np.abs(basetable[f'spread_model_{filt}']) < maxspread) &
+                    (~basetable[f'spread_model_{filt}'].mask))
+            # fracflux is intended to be a measure of how blended the source is. It's
+            # the PSF-weighted flux of the stamp after subtracting neighbors, divided
+            # by the PSF-weighted flux of the full image including neighbors. So if you
+            # have no neighbors around, it's 1. If typically half the flux in one of
+            # your pixels is from your neighbors, it's 0.5, where 'typically' is in a
+            # PSF-weighted sense.
+            ffok = ((basetable[f'fracflux_{filt}'] > minfracflux) & (~basetable[f'fracflux_{filt}'].mask))
+        elif f'qfit_{filt}' in basetable.colnames:
+            qfok = (basetable[f'qfit_{filt}'] < max_qfit)
+            qfmask = basetable[f'qfit_{filt}'].mask
+            spok = ((basetable[f'cfit_{filt}'] < max_cfit) &
+                    (~basetable[f'cfit_{filt}'].mask))
+            ffok = True
+
         basetable[f'good_{filt}'] = allok = (qfok & spok & ffok)
-        print(f"Filter {filt} has qf={qfok.sum()}, spread={spok.sum()}, fracflux={ffok.sum()} ok,"
-              f" totaling {allok.sum()}.  There are {len(basetable)} total, of which "
-              f"{mask.sum()} are masked and {(~mask).sum()} are unmasked. qfmasksum={qfmask.sum()}, inverse={(~qfmask).sum()}.")
+        print(f"Filter {filt} has qf={qfok.sum()}, spread={spok.sum()}, fracflux={ffok.sum() if hasattr(ffok, 'sum') else 1} ok,"
+            f" totaling {allok.sum()}.  There are {len(basetable)} total, of which "
+            f"{mask.sum()} are masked and {(~mask).sum()} are unmasked. qfmasksum={qfmask.sum()}, inverse={(~qfmask).sum()}.")
 
     all_good = np.all([basetable[f'good_{filt}'] for filt in filternames], axis=0)
     any_good = np.any([basetable[f'good_{filt}'] for filt in filternames], axis=0)
@@ -165,20 +175,31 @@ def main(basetable, ww):
     # masked arrays don't play nice
     goodqflong = np.array(goodqflong & ~goodqflong.mask)
     goodspreadlong = np.array(goodspreadlong & ~goodspreadlong.mask)
-    goodfracfluxlong = np.array(goodfracfluxlong & ~goodfracfluxlong.mask)
+    goodfracfluxlong = np.array(goodfracfluxlong & (~goodfracfluxlong.mask if hasattr(goodfracfluxlong, 'mask') else True))
     allgood_long = (goodqflong & goodspreadlong & goodfracfluxlong)
 
     badqflong = ~goodqflong
     badspreadlong = ~goodspreadlong
     badfracfluxlong = ~goodfracfluxlong
 
-    goodqfshort = ((basetable['qf_f212n'] > minqf) & (basetable['qf_f182m'] > minqf) & (basetable['qf_f187n'] > minqf))
-    goodspreadshort = ((basetable['spread_model_f212n'] < maxspread) & (basetable['spread_model_f182m'] < maxspread) & (basetable['spread_model_f187n'] < maxspread))
-    goodfracfluxshort = ((basetable['fracflux_f212n'] > minfracflux) & (basetable['fracflux_f182m'] > minfracflux) & (basetable['fracflux_f187n'] > minfracflux))
+    if 'qf_212n' in basetable.colnames:
+        goodqfshort = ((basetable['qf_f212n'] > minqf) & (basetable['qf_f182m'] > minqf) & (basetable['qf_f187n'] > minqf))
+        goodspreadshort = ((basetable['spread_model_f212n'] < maxspread) & (basetable['spread_model_f182m'] < maxspread) & (basetable['spread_model_f187n'] < maxspread))
+        goodfracfluxshort = ((basetable['fracflux_f212n'] > minfracflux) & (basetable['fracflux_f182m'] > minfracflux) & (basetable['fracflux_f187n'] > minfracflux))
+    else:
+        goodqfshort = ((basetable['qfit_f212n'] < max_qfit) &
+                      (basetable['qfit_f187n'] < max_qfit) &
+                      (basetable['qfit_f182m'] < max_qfit))
+        # I'm using the same variable name to save rewriting below... this is not a great choice
+        goodspreadshort = ((basetable['cfit_f212n'] < max_cfit) |
+                          (basetable['cfit_f187n'] < max_cfit) |
+                          (basetable['cfit_f182m'] < max_cfit))
+        goodfracfluxshort = True #((basetable['fracflux_f410m'] > minfracflux) | (basetable['fracflux_f405n'] > minfracflux) & (basetable['fracflux_f466n'] > minfracflux))
+
 
     goodqfshort = np.array(goodqfshort & ~goodqfshort.mask)
     goodspreadshort = np.array(goodspreadshort & ~goodspreadshort.mask)
-    goodfracfluxshort = np.array(goodfracfluxshort & ~goodfracfluxshort.mask)
+    goodfracfluxshort = np.array(goodfracfluxshort & (~goodfracfluxshort.mask if hasattr(goodfracfluxshort, 'mask') else True))
     allgood_short = (goodqfshort & goodspreadshort & goodfracfluxshort)
 
     badqfshort = ~goodqfshort
@@ -608,6 +629,7 @@ if __name__ == "__main__":
         print("Loaded merged")
     elif options.module == 'merged1182':
         from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182 = Table.read(f'{basepath}/catalogs/crowdsource_nsky0_merged_photometry_tables_merged.fits')
         result = main(basetable_merged1182, ww=ww)
         globals().update(result)
         basetable = basetable_merged1182
@@ -620,21 +642,54 @@ if __name__ == "__main__":
         basetable = basetable_merged1182_blur
         print("Loaded merged1182_blur")
 
-    elif options.module == 'merged1182_daophot':
+    elif options.module == 'merged1182_daophot_iterative':
         from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
         basetable_merged1182_daophot = Table.read(f'{basepath}/catalogs/iterative_merged_photometry_tables_merged.fits')
         result = main(basetable_merged1182_daophot, ww=ww)
         globals().update(result)
         basetable = basetable_merged1182_daophot
-        print("Loaded merged1182_daophot")
+        print("Loaded merged1182_daophot_iterative")
 
-    elif options.module == 'merged1182_daophot_blur':
+    elif options.module == 'merged1182_daophot_iterative_blur':
         from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
         basetable_merged1182_daophot_blur = Table.read(f'{basepath}/catalogs/iterative_merged_photometry_tables_merged_blur.fits')
         result = main(basetable_merged1182_daophot_blur, ww=ww)
         globals().update(result)
         basetable = basetable_merged1182_daophot_blur
-        print("Loaded merged1182_daophot")
+        print("Loaded merged1182_daophot_iterative_blur")
+
+    elif options.module == 'merged1182_daophot_basic':
+        from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182_daophot = Table.read(f'{basepath}/catalogs/basic_merged_photometry_tables_merged.fits')
+        result = main(basetable_merged1182_daophot, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged1182_daophot
+        print("Loaded merged1182_daophot_basic")
+
+    elif options.module == 'merged1182_daophot_basic_blur':
+        from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182_daophot_blur = Table.read(f'{basepath}/catalogs/basic_merged_photometry_tables_merged_blur.fits')
+        result = main(basetable_merged1182_daophot_blur, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged1182_daophot_blur
+        print("Loaded merged1182_daophot_basic_blur")
+
+    elif options.module == 'merged1182_daophot_basic_bgsub':
+        from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182_daophot_bgsub = Table.read(f'{basepath}/catalogs/basic_merged_photometry_tables_merged_bgsub.fits')
+        result = main(basetable_merged1182_daophot_bgsub, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged1182_daophot_bgsub
+        print("Loaded merged1182_daophot_basic_bgsub")
+
+    elif options.module == 'merged1182_daophot_basic_bgsub_blur':
+        from analysis_setup import fh_merged as fh, ww410_merged as ww410, ww410_merged as ww
+        basetable_merged1182_daophot_bgsub_blur = Table.read(f'{basepath}/catalogs/basic_merged_photometry_tables_merged_bgsub_blur.fits')
+        result = main(basetable_merged1182_daophot_bgsub_blur, ww=ww)
+        globals().update(result)
+        basetable = basetable_merged1182_daophot_bgsub_blur
+        print("Loaded merged1182_daophot_basic_bgsub_blur")
+
 
 
     elif options.module == 'merged-reproject':
