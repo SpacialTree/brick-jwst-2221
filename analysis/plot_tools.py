@@ -187,6 +187,7 @@ def cmds(basetable, sel=True,
 
     if exclude is None:
         include = slice(None)
+        default_sel = sel
     else:
         include = ~exclude
         default_sel = sel & include
@@ -908,14 +909,10 @@ def sed_and_starzoom_plot(coord, basetable, idx=None, fignum=1, title=None, modu
             lamflam = (fluxes * wavelengths.to(u.Hz, u.spectral())).to(u.erg/u.s/u.cm**2)
             #lamflamlim = [(lims[i] * wavelengths[i].to(u.Hz, u.spectral())).to(u.erg/u.s/u.cm**2) for i in range(len(wavelengths))]
             lamflamlim = (lims * wavelengths.to(u.Hz, u.spectral())).to(u.erg/u.s/u.cm**2)
-            with quantity_support():
-                ax.errorbar(u.Quantity(wavelengths, u.um), 
-                            u.Quantity(lamflam),
-                            xerr=[w.to(u.um)/2 for w in widths], linestyle='none', marker='x')
-                ax.errorbar(u.Quantity(wavelengths, u.um), 
-                            u.Quantity(lamflamlim), 
-                            xerr=[w.to(u.um)/2 for w in widths], linestyle='none', marker='v')
-                #ax.errorbar(u.Quantity(wavelengths, u.um).value, lamflamlim.value, xerr=[w.to(u.um).value/2 for w in widths], linestyle='none', marker='v')
+            ax.errorbar(u.Quantity(wavelengths, u.um),
+                        lamflam,
+                        xerr=[w/2 for w in widths], linestyle='none', marker='x')
+            ax.errorbar(wavelengths.to(u.um), lamflamlim, xerr=[w/2 for w in widths], linestyle='none', marker='v')
             if title is None:
                 ax.set_title(f"{coord}")
             else:
@@ -1074,3 +1071,56 @@ def starzoom_cals(reference_coordinates, filtername='f212n', module='nrca1',
             ax.set_yticks([])
         pl.tight_layout()
 
+
+def diagnostic_stamps_by_mag_dao(*args, **kwargs):
+    return diagnostic_stamps_by_mag(*args, **kwargs, flux_kw='flux_fit', dao=True)
+
+
+def diagnostic_stamps_by_mag_crowdsource(*args, **kwargs):
+    return diagnostic_stamps_by_mag(*args, **kwargs, flux_kw='flux', dao=False)
+
+
+def diagnostic_stamps_by_mag(result, residual, pixel_area, filtername, data, sz=7, ind_offset=0, flux_kw='flux_fit', dao=True):
+    flux_jy = (result[flux_kw] * u.MJy/u.sr * pixel_area).to(u.Jy)
+    jfilts = SvoFps.get_filter_list('JWST')
+    jfilts.add_index('filterID')
+    zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.{filtername.upper()}']['ZeroPoint'], u.Jy)
+    abmag = -2.5 * np.log10(flux_jy / zeropoint)
+
+    magbins = np.arange(17, 12.0, -0.5)
+    ncol = len(magbins)
+
+    pl.figure(figsize=(20,5))
+    for ii, mag in enumerate(magbins):
+        sel = (abmag > mag-0.5) & (abmag <= mag)
+        n = sel.sum()
+        try:
+            row = result[sel][int(n/2)+ind_offset]
+        except IndexError:
+            continue
+        if dao:
+            x, y = map(int, (row['x_init'], row['y_init']))
+        else:
+            x, y = map(int, (row['x'], row['y']))
+
+        cutout = data[y-sz:y+sz+1, x-sz:x+sz+1]
+        residual_cutout = residual[y-sz:y+sz+1, x-sz:x+sz+1]
+        if cutout.size == 0:
+            continue
+
+        pl.subplot(2, ncol, ii+1).imshow(cutout, cmap='gray', norm=simple_norm(cutout, stretch='log'))
+        if dao:
+            pl.scatter(row['x_init'] - x + sz, row['y_init'] - y + sz, marker='x', color='r')
+            pl.scatter(row['x_fit'] - x + sz, row['y_fit'] - y + sz, marker='x', color='b')
+
+            sel = (result['x_fit'] > x - sz) & (result['x_fit'] < x + sz) & (result['y_fit'] > y - sz) & (result['y_fit'] < y + sz)
+            pl.scatter(result['x_fit'][sel] - x + sz, result['y_fit'][sel] - y + sz, marker='.', color='g', s=1)
+        else:
+            pl.scatter(row['x'] - x + sz, row['y'] - y + sz, marker='x', color='r')
+
+            sel = (result['x'] > x - sz) & (result['x'] < x + sz) & (result['y'] > y - sz) & (result['y'] < y + sz)
+            pl.scatter(result['x'][sel] - x + sz, result['y'][sel] - y + sz, marker='.', color='b', s=1)
+
+        pl.title(f'{mag-0.5} < mag < {mag}')
+        pl.subplot(2, ncol, ii+1+ncol).imshow(residual_cutout, cmap='gray')
+    pl.tight_layout()

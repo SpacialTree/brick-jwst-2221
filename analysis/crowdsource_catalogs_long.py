@@ -209,6 +209,7 @@ def catalog_zoom_diagnostic(data, modsky, zoomcut, stars):
         neg = stars['flux_fit'] < 0
     else:
         qgood = np.ones(len(stars), dtype='bool')
+        neg = np.zeros(len(stars), dtype='bool')
 
     axlims = pl.axis()
     if zoomcut[0].start:
@@ -259,7 +260,8 @@ def save_crowdsource_results(results, ww, filename, suffix,
     stars.meta['filter'] = filtername
     stars.meta['module'] = module
     stars.meta['detector'] = detector
-
+    if exposure_:
+        stars.meta['exposure'] = exposure_
 
     tblfilename = (f"{basepath}/{filtername}/"
                     f"{filtername.lower()}_{module}{exposure_}{desat}{bgsub}{fpsf}{blur_}"
@@ -307,7 +309,10 @@ def load_data(filename):
     return fh, im1, data, wht, err, instrument, telescope, obsdate
 
 
-def get_psf_model(filtername, proposal_id, field, use_webbpsf=False,
+def get_psf_model(filtername, proposal_id, field,
+                  module,
+                  use_webbpsf=False,
+                  obsdate=None,
                   use_grid=False,
                   blur=False,
                   target='brick',
@@ -353,13 +358,16 @@ def get_psf_model(filtername, proposal_id, field, use_webbpsf=False,
                 print("Attempting to download WebbPSF data", flush=True)
                 nrc = webbpsf.NIRCam()
                 nrc.load_wss_opd_by_date(f'{obsdate}T00:00:00')
-                nrc.filter = filt
-                print(f"Running {module}{exposure_}{desat}{bgsub}")
+                nrc.filter = filtername
                 if module in ('nrca', 'nrcb'):
-                    if 'F4' in filt.upper():
+                    if 'F4' in filtername.upper():
                         nrc.detector = f'{module.upper()}5' # I think NRCA5 must be the "long" detector?
                     else:
                         nrc.detector = f'{module.upper()}1' #TODO: figure out a way to use all 4?
+                    grid = nrc.psf_grid(num_psfs=16, all_detectors=False, verbose=True, save=True)
+                elif 'nrc' in module:
+                    # Allow nrca1, nrca2, ...
+                    nrc.detector = module.upper()
                     grid = nrc.psf_grid(num_psfs=16, all_detectors=False, verbose=True, save=True)
                 else:
                     grid = nrc.psf_grid(num_psfs=16, all_detectors=True, verbose=True, save=True)
@@ -387,9 +395,9 @@ def get_psf_model(filtername, proposal_id, field, use_webbpsf=False,
             #psf_model = crowdsource.psf.SimplePSF(stamp=grid(xx,yy))
 
             # bigger PSF probably needed
-            yy, xx = np.indices([61,61], dtype=float)
+            yy, xx = np.indices([61, 61], dtype=float)
             grid.x_0 = grid.y_0 = 30
-            psf_model = crowdsource.psf.SimplePSF(stamp=grid(xx,yy))
+            psf_model = crowdsource.psf.SimplePSF(stamp=grid(xx, yy))
 
             return grid, psf_model
     else:
@@ -408,9 +416,10 @@ def get_psf_model(filtername, proposal_id, field, use_webbpsf=False,
         return grid, psf_model
 
 
-def get_uncertainty(err, data, wht=None):
+def get_uncertainty(err, data, dq=None, wht=None):
 
-    dq = np.zeros(data.shape, dtype='int')
+    if dq is None:
+        dq = np.zeros(data.shape, dtype='int')
 
     # crowdsource uses inverse-sigma, not inverse-variance
     weight = err**-1
@@ -421,6 +430,9 @@ def get_uncertainty(err, data, wht=None):
     #weight[(err == 0) | (wht == 0)] = np.nanmedian(weight)
     weight[np.isnan(weight)] = 0
     bad = np.isnan(weight) | (data == 0) | np.isnan(data) | (weight == 0) | (err == 0) | (data < 1e-5)
+    if dq is not None:
+        # only 0 is OK
+        bad |= (dq != 0)
     if wht is not None:
         bad |= (wht == 0)
 
@@ -518,18 +530,29 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
 
     print(f"options: {options}")
 
+    # need to have incrementing _before_ test
+    index = -1
+
     for module in modules:
         detector = module # no sub-detectors for long-NIRCAM
         for filtername in filternames:
             if options.each_exposure:
-                filenames = get_filenames(basepath, filtername, proposal_id, field, each_suffix=options.each_suffix, pupil='clear')
+                filenames = get_filenames(basepath, filtername, proposal_id, field, each_suffix=options.each_suffix, module=module, pupil='clear')
                 print(f"Looping over filenames {filenames}")
                 # jw02221001001_07101_00024_nrcblong_destreak_o001_crf.fits
                 for filename in filenames:
+
+                    index += 1
+                    # enable array jobs
+                    if os.getenv('SLURM_ARRAY_TASK_ID') is not None and int(os.getenv('SLURM_ARRAY_TASK_ID')) != index:
+                        print(f'Task={os.getenv("SLURM_ARRAY_TASK_ID")} does not match index {index}')
+                        continue
+
                     exposure_id = filename.split("_")[2]
                     do_photometry_step(options, filtername, module, detector,
                                        field, basepath, filename, proposal_id,
                                        crowdsource_default_kwargs, exposurenumber=int(exposure_id),
+                                       use_webbpsf=True,
                                        bg_boxsizes=bg_boxsizes)
             else:
                 filename = get_filename(basepath, filtername, proposal_id, field, module, options=options, pupil='clear')
@@ -539,9 +562,10 @@ def main(smoothing_scales={'f182m': 0.25, 'f187n':0.25, 'f212n':0.55,
                                    )
 
 
-def get_filenames(basepath, filtername, proposal_id, field, each_suffix, pupil='clear'):
+def get_filenames(basepath, filtername, proposal_id, field, each_suffix, module, pupil='clear'):
+
     # 001001_07101_00024
-    glstr = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}{field}001*{each_suffix}.fits'
+    glstr = f'{basepath}/{filtername}/pipeline/jw0{proposal_id}{field}001*{module}*{each_suffix}.fits'
     fglob = glob.glob(glstr)
     if len(fglob) == 0:
         raise ValueError(f"No matches found to {glstr}")
@@ -584,6 +608,7 @@ def get_filename(basepath, filtername, proposal_id, field, module, options, pupi
 def do_photometry_step(options, filtername, module, detector, field, basepath,
                        filename, proposal_id, crowdsource_default_kwargs, exposurenumber=None,
                        bg_boxsizes=None,
+                       use_webbpsf=False,
                        pupil='clear'):
     print(f"Starting {field} filter {filtername} module {module} detector {detector} {exposurenumber}", flush=True)
     fwhm_tbl = Table.read(f'{basepath}/reduction/fwhm_table.ecsv')
@@ -626,9 +651,13 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
 
     # Load PSF model
     grid, psf_model = get_psf_model(filtername, proposal_id, field,
-                                    use_webbpsf=False, use_grid=False,
+                                    module=module,
+                                    use_webbpsf=use_webbpsf,
+                                    # if we're doing each exposure, we want the full grid
+                                    use_grid=options.each_exposure,
                                     blur=options.blur,
                                     target=options.target,
+                                    obsdate=obsdate,
                                     basepath='/blue/adamginsburg/adamginsburg/jwst/')
     dao_psf_model = grid
 
@@ -644,7 +673,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
     # dao_psf_model.y_0.min = -max_pixel_offset
     # dao_psf_model.y_0.max = max_pixel_offset
 
-    dq, weight, bad = get_uncertainty(err, data, wht=wht)
+    dq, weight, bad = get_uncertainty(err, data, wht=wht, dq=im1['DQ'].data if 'DQ' in im1 else None)
 
     filter_table = SvoFps.get_filter_list(facility=telescope, instrument=instrument)
     filter_table.add_index('filterID')
@@ -764,7 +793,8 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
         fig = pl.figure(0, figsize=(10,10))
         fig.clf()
         ax = fig.gca()
-        im = ax.imshow(weight, norm=simple_norm(weight, stretch='log')); pl.colorbar(mappable=im);
+        im = ax.imshow(weight, norm=simple_norm(weight, stretch='log'))
+        pl.colorbar(mappable=im)
         pl.savefig(f'{basepath}/{filtername}/pipeline/jw0{proposal_id}-o{field}_t001_nircam_{pupil}-{filtername.lower()}-{module}{exposure_}{desat}{bgsub}_weights.png',
                    bbox_inches='tight')
 
@@ -891,7 +921,9 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
         print(f'len(result) = {len(result)}, len(coords) = {len(coords)}, type(result)={type(result)}', flush=True)
         result['skycoord_centroid'] = coords
         detector = "" # no detector #'s for long
-        basic_daophot_catalog_fn = f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{desat}{bgsub}{epsf_}{blur_}{group}_daophot_basic.fits"
+        basic_daophot_catalog_fn = f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{exposure_}{desat}{bgsub}{epsf_}{blur_}{group}_daophot_basic.fits"
+        if exposure is not None:
+            result.meta['exposure'] = exposure
         result.write(basic_daophot_catalog_fn, overwrite=True)
         print(f"Completed BASIC photometry, and wrote out file {basic_daophot_catalog_fn}")
 
@@ -985,8 +1017,9 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
                                        fitter=LevMarLSQFitter(),
                                        maxiters=5,
                                        fit_shape=(5, 5),
+                                       sub_shape=(15, 15),
                                        aperture_radius=2*fwhm_pix,
-                                       progress_bar=True
+                                       progress_bar=True,
                                       )
 
         print("About to do ITERATIVE photometry....")
@@ -999,9 +1032,11 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
 
         coords2 = ww.pixel_to_world(result2['x_fit'], result2['y_fit'])
         result2['skycoord_centroid'] = coords2
+        if exposure is not None:
+            result2.meta['exposure'] = exposure
         print(f'len(result2) = {len(result2)}, len(coords) = {len(coords2)}', flush=True)
         result2.write(f"{basepath}/{filtername}/{filtername.lower()}"
-                      f"_{module}{detector}{desat}{bgsub}{epsf_}{blur_}{group}"
+                      f"_{module}{detector}{exposure_}{desat}{bgsub}{epsf_}{blur_}{group}"
                       f"_daophot_iterative.fits", overwrite=True)
         print("Saved iterative catalog")
         stars = result2
