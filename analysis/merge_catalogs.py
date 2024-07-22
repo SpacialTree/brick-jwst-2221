@@ -14,7 +14,6 @@ from astropy.modeling.fitting import LevMarLSQFitter
 from astropy import stats
 from astropy.table import Table, Column, MaskedColumn
 from astropy.wcs import WCS
-from astropy.table import Table
 from astropy.coordinates import SkyCoord
 from astropy import coordinates
 from astropy.visualization import simple_norm
@@ -29,43 +28,32 @@ from tqdm.auto import tqdm
 import pylab as pl
 pl.rcParams['figure.facecolor'] = 'w'
 pl.rcParams['image.origin'] = 'lower'
-pl.rcParams['figure.figsize'] = (10,8)
+pl.rcParams['figure.figsize'] = (10, 8)
 pl.rcParams['figure.dpi'] = 100
 
-#basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
-filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
+filternames = filternames_narrow = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m']
 miri_filternames = ['f2250w']
 all_filternames = ['f410m', 'f212n', 'f466n', 'f405n', 'f187n', 'f182m', 'f444w', 'f356w', 'f200w', 'f115w']
-#obs_filters = {'2221': filternames,
-#               '1182': ['f444w', 'f356w', 'f200w', 'f115w']
-#              }
-obs_filters = {
-                'brick': {
-                    '2221': filternames,
-                    '1182': ['f444w', 'f356w', 'f200w', 'f115w'],
-                          },
-                'cloudc': {
-                    '2221': filternames,
-                           },
+obs_filters = {'brick': {'2221': filternames,
+                         '1182': ['f444w', 'f356w', 'f200w', 'f115w'],
+                         },
+               'cloudc': {'2221': filternames},
                }
+
 # Using the 'brick' keyword here makes it work for now, need to figure out how to
 # refactor it in cases where there are more filters available for other targets!
-#filter_to_project = {vv: key for key, val in obs_filters.items() for vv in val}
 filter_to_project = {vv: key for key, val in obs_filters['brick'].items() for vv in val}
 # need to refactor this somehow for cloudc
-#project_obsnum = {'2221': '001',
-#                  '1182': '004',
-#                 }
+# project_obsnum = {'2221': '001',
+#                   '1182': '004',
+#                  }
 
-project_obsnum = {
-                  'brick': {
-                      '2221': '001',
-                      '1182': '004',
+project_obsnum = {'brick': {'2221': '001',
+                            '1182': '004',
                             },
-                  'cloudc': {
-                      '2221': '002',
+                  'cloudc': {'2221': '002',
                              },
-                 }
+                  }
 
 def getmtime(x):
     return datetime.datetime.fromtimestamp(os.path.getmtime(x)).strftime('%Y-%m-%d %H:%M:%S')
@@ -77,7 +65,6 @@ def sanity_check_individual_table(tbl):
 
     tbl = tbl.copy()
     tbl.sort('flux_jy')
-    #finite_fluxes = np.isfinite(np.array(tbl['flux_jy']))
     finite_fluxes = tbl['flux_jy'] > 0
 
     jfilts = SvoFps.get_filter_list('JWST')
@@ -90,9 +77,9 @@ def sanity_check_individual_table(tbl):
     abmag = -2.5 * np.log10(flux_jy / zeropoint) * u.mag
 
     # there are negative fluxes -> nan mags
-    #print(f"Maximum difference between the two tables: {np.abs(abmag-abmag_tbl).max()}")
+    # print(f"Maximum difference between the two tables: {np.abs(abmag-abmag_tbl).max()}")
     print(f"Nanmax difference between the two tables: {np.nanmax(np.abs(abmag-abmag_tbl))}")
-    #print("NaNs: (mag, flux) ", abmag_tbl[np.isnan(abmag_tbl)], flux_jy[np.isnan(abmag_tbl)])
+    # print("NaNs: (mag, flux) ", abmag_tbl[np.isnan(abmag_tbl)], flux_jy[np.isnan(abmag_tbl)])
 
     print(f"Max flux in tbl for {wl}: {tbl['flux'].max()};"
           f" in jy={flux_jy.max()}; magmin={abmag_tbl.min()}={np.nanmin(abmag_tbl)}, magmax={abmag_tbl.max()}={np.nanmax(abmag_tbl)}")
@@ -133,7 +120,6 @@ def combine_singleframe(tbls, max_offset=0.15 * u.arcsec):
             tbl['dra'] = tbl['dy'] * pixscale.value
             tbl['ddec'] = tbl['dx'] * pixscale.value
 
-
     # do one loop of re-matching
     for ii, tbl in enumerate(tbls):
         crds = tbl['skycoord']
@@ -170,7 +156,7 @@ def combine_singleframe(tbls, max_offset=0.15 * u.arcsec):
             print(f"Added {len(newcrds)} new sources in exposure {tbl.meta['exposure']}", flush=True)
 
     arrays = {key: np.zeros([len(basecrds), len(tbls)], dtype='float') * np.nan
-              for key in ('flux', 'dflux', 'qf', 'rchi2', 'fracflux', 'fwhm', 'fluxiso', 'flags', 'sky', 'ra', 'dec', 'dra', 'ddec')}
+              for key in ('flux', 'dflux', 'qf', 'rchi2', 'fracflux', 'fwhm', 'fluxiso', 'flags', 'spread_model', 'sky', 'ra', 'dec', 'dra', 'ddec')}
 
     for ii, tbl in enumerate(tqdm(tbls, desc='Table Loop (stack)')):
         crds = tbl['skycoord']
@@ -215,7 +201,7 @@ def combine_singleframe(tbls, max_offset=0.15 * u.arcsec):
     newtbl['dflux_prop'] = (np.nansum(newtbl['dflux']**2 * weights, axis=1) / np.nansum(weights, axis=1))**0.5
     newtbl.meta['dflux_prop'] = 'propagated uncertainty on flux = 1/sum(weights)'
 
-    for key in ('flux', 'dflux', 'sky', 'qf', 'fracflux', 'fwhm', 'rchi2', 'fluxiso', 'dra', 'ddec'):
+    for key in ('flux', 'dflux', 'sky', 'qf', 'fracflux', 'fwhm', 'rchi2', 'fluxiso', 'dra', 'ddec', 'spread_model'):
         newtbl[f'{key}_avg'] = nanaverage(newtbl[f'{key}'], weights=weights, axis=1)
         newtbl[f'std_{key}_avg'] = nanaverage((newtbl[f'{key}'] - newtbl[f'{key}_avg'][:, None])**2, weights=weights, axis=1)**0.5
 
@@ -227,6 +213,8 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
                    epsf=False, bgsub=False, desat=False, blur=False,
                    max_offset=0.15 * u.arcsec, target='brick',
                    indivexp=False,
+                   qfcut=None, fracfluxcut=None,
+                   min_nmatch_narrow=4,
                    basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     print(f'Starting merge catalogs: catalog_type: {catalog_type} module: {module} target: {target}', flush=True)
 
@@ -271,8 +259,8 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
 
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        #for colname in basetable.colnames:
-        #    basetable.rename_column(colname, colname+"_"+basetable.meta['filter'])
+        # for colname in basetable.colnames:
+        #     basetable.rename_column(colname, colname+"_"+basetable.meta['filter'])
 
         for tbl in tqdm(tbls, desc='Table Loop'):
             t0 = time.time()
@@ -322,7 +310,8 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
             for key in tbl.meta:
                 meta[f'{wl[1:-1]}{key[:4]}'.upper()] = tbl.meta[key]
 
-            print(f"merging tables step: max flux for {wl} in merged table is {basetable['flux_'+wl].max()} {np.nanmax(np.array(basetable['flux_jy_'+wl]))} {np.nanmin(np.array(basetable['mag_ab_'+wl]))}")
+            print(f"merging tables step: max flux for {wl} in merged table is {basetable['flux_'+wl].max()}"
+                  f" {np.nanmax(np.array(basetable['flux_jy_'+wl]))} {np.nanmin(np.array(basetable['mag_ab_'+wl]))}")
             # DEBUG
             # DEBUG if hasattr(basetable[f'{cn}_{wl}'], 'mask'):
             # DEBUG     print(f"Table has mask sum for column {cn} {basetable[cn+'_'+wl].mask.sum()}")
@@ -341,12 +330,11 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
                   f"There are then {basetable[f'near_saturated_{wl}_{wl}'].sum()} in the merged table.  "
                   f"There are also {basetable[f'replaced_saturated_{wl}'].sum()} replaced saturated.", flush=True)
 
-
         print(f"Stacked all rows into table with len={len(basetable)}", flush=True)
-        zeropoint410 = u.Quantity(jfilts.loc[f'JWST/NIRCam.F410M']['ZeroPoint'], u.Jy)
-        zeropoint182 = u.Quantity(jfilts.loc[f'JWST/NIRCam.F182M']['ZeroPoint'], u.Jy)
-        zeropoint405 = u.Quantity(jfilts.loc[f'JWST/NIRCam.F405N']['ZeroPoint'], u.Jy)
-        zeropoint187 = u.Quantity(jfilts.loc[f'JWST/NIRCam.F187N']['ZeroPoint'], u.Jy)
+        zeropoint410 = u.Quantity(jfilts.loc['JWST/NIRCam.F410M']['ZeroPoint'], u.Jy)
+        zeropoint182 = u.Quantity(jfilts.loc['JWST/NIRCam.F182M']['ZeroPoint'], u.Jy)
+        zeropoint405 = u.Quantity(jfilts.loc['JWST/NIRCam.F405N']['ZeroPoint'], u.Jy)
+        zeropoint187 = u.Quantity(jfilts.loc['JWST/NIRCam.F187N']['ZeroPoint'], u.Jy)
 
         # Line-subtract the F410 continuum band
         # 0.16 is from BrA_separation
@@ -373,7 +361,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         basetable.add_column(basetable['flux_jy_f187n'] - basetable['flux_jy_182m187'], name='flux_jy_187m182')
         basetable.add_column(-2.5*np.log10(basetable['flux_jy_187m182'] / zeropoint187), name='mag_ab_187m182')
 
-
+        """ # this adds to the file size too much
         # Add some important colors
 
         colors=[('f410m', 'f466n'),
@@ -403,6 +391,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
             if f'mag_ab_{c1}' in basetable.colnames and f'mag_ab_{c2}' in basetable.colnames:
                 basetable.add_column(basetable[f'mag_ab_{c1}']-basetable[f'mag_ab_{c2}'], name=f'color_{c1}-{c2}')
                 basetable.add_column((basetable[f'emag_ab_{c1}']**2 + basetable[f'emag_ab_{c2}']**2)**0.5, name=f'ecolor_{c1}-{c2}')
+        """
 
         # DEBUG for colname in basetable.colnames:
         # DEBUG     print(f"colname {colname} has mask: {hasattr(basetable[colname], 'mask')}")
@@ -413,7 +402,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         indivexp = '_indivexp' if indivexp else ''
         tablename = f"{basepath}/catalogs/{catalog_type}_{module}{indivexp}_photometry_tables_merged{desat}{bgsub}{epsf_}{blur_}"
         t0 = time.time()
-        print(f"Writing table {tablename}", flush=True)
+        print(f"Writing table {tablename} with len={len(basetable)}", flush=True)
         # use caps b/c FITS will force it to caps anyway
         basetable.meta['VERSION'] = datetime.datetime.now().isoformat()
         # DO NOT USE FITS in production, it drops critical metadata
@@ -435,11 +424,35 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         basetable.write(f"{tablename}.ecsv", overwrite=True)
         print(f"Done writing table {tablename}.ecsv in {time.time()-t0:0.1f} seconds", flush=True)
 
+        # keep any rows with at least two qf cut pass
+        if qfcut is not None:
+            qfkeep = np.array([basetable[qfkey] > qfcut for qfkey in basetable.colnames if 'qf' in qfkey]).sum(axis=0) > 1
+            print(f"Keeping {qfkeep.sum()} sources of {len(basetable)} with qf > {qfcut}")
+            basetable = basetable[qfkeep]
+
+        if fracfluxcut is not None:
+            fracfluxkeep = np.array([basetable[fracfluxkey] > fracfluxcut for fracfluxkey in basetable.colnames if 'fracflux' in fracfluxkey]).sum(axis=0) > 1
+            print(f"Keeping {fracfluxkeep.sum()} sources of {len(basetable)} with fracflux > {fracfluxcut}")
+            basetable = basetable[fracfluxkeep]
+
+        if min_nmatch_narrow is not None:
+            match_brick_narrow = np.array([basetable[f'nmatch_good_{filn}'] > min_nmatch_narrow for filn in filternames_narrow]).sum(axis=0) > 1
+            print(f"Keeping {match_brick_narrow.sum()} sources of {len(basetable)} with at least {min_nmatch_narrow} matches in two or more of the narrower bands")
+            basetable = basetable[match_brick_narrow]
+
+        if qfcut is not None or fracfluxcut is not None:
+            print(f"Saving merged version with qualcuts: {tablename}_qualcuts.fits with len={len(basetable)}")
+            basetable.write(f"{tablename}_qualcuts.fits", overwrite=True)
+
+        oksep = (np.array([basetable[f'sep_{filtername}'] < 0.1*u.arcsec for filtername in filternames if 'w' not in filtername]).sum(axis=0) > 1)
+        basetable[oksep].write(f"{tablename}_qualcuts_oksep2221.fits", overwrite=True)
+
 
 def merge_crowdsource_individual_frames(module='merged', suffix="", desat=False, filtername='f410m',
                                         progid='2221',
                                         bgsub=False, epsf=False, fitpsf=False, blur=False, target='brick',
                                         exposure_numbers=np.arange(1, 25),
+                                        max_visitid=10,
                                         basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
 
     desat = "_unsatstar" if desat else ""
@@ -455,11 +468,15 @@ def merge_crowdsource_individual_frames(module='merged', suffix="", desat=False,
     tblfns = [x
               for module_ in modules
               for progid in obs_filters[target]
-              for exposure in range(50)
+              for visitid in range(1, max_visitid+1)
+              for exposure in exposure_numbers
               for x in glob.glob(f"{basepath}/{filtername.upper()}/"
-                                 f"{filtername.lower()}_{module_}_obs{project_obsnum[target][progid]}_exp{exposure:05d}{desat}{bgsub}{fitpsf}{blur_}"
+                                 f"{filtername.lower()}_{module_}_visit{visitid:03d}_exp{exposure:05d}{desat}{bgsub}{fitpsf}{blur_}"
                                  f"_crowdsource{suffix}.fits")
               ]
+    tblfns = sorted(set(tblfns))
+    print(f"Found {len(tblfns)} tables for {filtername.lower()}_*_visit*_exp*{desat}{bgsub}{fitpsf}{blur_}:")
+    print("\n".join(tblfns))
 
     if len(tblfns) == 0:
         raise ValueError(f"No tables found matching {basepath}/{filtername.upper()}/{filtername.lower()}_{module}....{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits")
@@ -471,12 +488,12 @@ def merge_crowdsource_individual_frames(module='merged', suffix="", desat=False,
 
     merged_exposure_table = combine_singleframe(tables)
 
-    outfn = f"{basepath}/catalogs/{filtername.lower()}_{module}_obs{project_obsnum[target][progid]}_indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}_allcols.fits"
+    outfn = f"{basepath}/catalogs/{filtername.lower()}_{module}_indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}_allcols.fits"
     merged_exposure_table.write(outfn, overwrite=True)
 
     # make a table that is nearly equivalent to standard crowdsource tables (with no 'x' or 'y' coordinate)
     minimal_version = {colname: merged_exposure_table[f'{colname}_avg']
-                       for colname in ('flux', 'dflux', 'skycoord', 'qf', 'rchi2', 'fracflux', 'fwhm', 'fluxiso',)}
+                       for colname in ('flux', 'dflux', 'skycoord', 'qf', 'rchi2', 'fracflux', 'fwhm', 'fluxiso', 'spread_model')}
     for key in ('dra', 'ddec', 'nmatch', 'nmatch_good', 'dflux_prop'):
         minimal_version[key] = merged_exposure_table[key]
 
@@ -490,7 +507,8 @@ def merge_crowdsource_individual_frames(module='merged', suffix="", desat=False,
         print(f"Rejected {reject.sum()} sources that had nan coordinates.")
         minimal_table = minimal_table[~reject]
 
-    outfn = f"{basepath}/catalogs/{filtername.lower()}_{module}_obs{project_obsnum[target][progid]}_indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits"
+    print(f"Final table length is {len(minimal_table)}")
+    outfn = f"{basepath}/catalogs/{filtername.lower()}_{module}_indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits"
     minimal_table.write(outfn, overwrite=True)
 
     return minimal_table
@@ -505,12 +523,12 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False,
     print()
     print(f'Starting merge crowdsource module: {module} suffix: {suffix} target: {target}')
     imgfns = [x
-          for obsid in obs_filters[target]
-          for filn in obs_filters[target][obsid]
-          for x in glob.glob(f"{basepath}/{filn.upper()}/pipeline/"
-                             f"jw0{obsid}-o{project_obsnum[target][obsid]}_t001_nircam*{filn.lower()}*{module}_i2d.fits")
-          if f'{module}_' in x or f'{module}1_' in x
-         ]
+              for obsid in obs_filters[target]
+              for filn in obs_filters[target][obsid]
+              for x in glob.glob(f"{basepath}/{filn.upper()}/pipeline/"
+                                 f"jw0{obsid}-o{project_obsnum[target][obsid]}_t001_nircam*{filn.lower()}*{module}_i2d.fits")
+              if f'{module}_' in x or f'{module}1_' in x
+             ]
 
     desat = "_unsatstar" if desat else ""
     bgsub = '_bgsub' if bgsub else ''
@@ -525,16 +543,17 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False,
     if indivexp:
         catfns = [x
                   for filn in filternames
-                  for x in glob.glob(f"{basepath}/catalogs/{filn.lower()}*{module}*obs*indivexp*{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits")
+                  for x in glob.glob(f"{basepath}/catalogs/{filn.lower()}*{module}*indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits")
                   ]
         if len(catfns) == 0:
             filn = 'f405n'
-            raise ValueError(f"{basepath}/catalogs/{filn.lower()}*{module}*obs*indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits had no matches")
+            raise ValueError(f"{basepath}/catalogs/{filn.lower()}*{module}*indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits had no matches")
         if len(catfns) != len(imgfns):
+            print("WARNING: Different length of imgfns & catfns!")
             print("imgfns:", imgfns)
             print("catfns:", catfns)
             print(dict(zip(imgfns, catfns)))
-            raise ValueError(f"{basepath}/catalogs/FILTER*{module}*obs*indivexp*{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits had different n(imgs) than n(cats)")
+            #raise ValueError(f"{basepath}/catalogs/FILTER*{module}*obs*indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_crowdsource{suffix}.fits had different n(imgs) than n(cats)")
     else:
         catfns = [x
                 for filn in filternames
@@ -558,9 +577,6 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False,
         #wcses = [wcs.WCS(fits.getheader(fn.replace("_crowdsource", "_crowdsource_skymodel"))) for fn in catfns]
         imgs = [fits.getdata(fn, ext=('SCI', 1)) for fn in imgfns]
         wcses = [wcs.WCS(fits.getheader(fn, ext=('SCI', 1))) for fn in imgfns]
-
-    assert len(wcses) == len(tbls), imgfns
-    assert len(imgs) == len(tbls)
 
     for tbl, ww in zip(tbls, wcses):
         # Now done in the original catalog making step tbl['y'],tbl['x'] = tbl['x'],tbl['y']
@@ -611,10 +627,14 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False,
                    catalog_type=f'crowdsource{suffix}{"_desat" if desat else ""}{"_bgsub" if bgsub else ""}',
                    module=module, bgsub=bgsub, desat=desat, epsf=epsf, target=target,
                    blur=blur,
+                   indivexp=indivexp,
+                   qfcut=0.9,
+                   fracfluxcut=0.75,
                    basepath=basepath)
 
 
 def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False, bgsub=False, epsf=False, blur=False, target='brick',
+                  indivexp=False,
                   basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
 
     desat = "_unsatstar" if desat else ""
@@ -685,7 +705,7 @@ def merge_daophot(module='nrca', detector='', daophot_type='basic', desat=False,
         tbl.add_column(abmag_err, name='emag_ab')
 
     merge_catalogs(tbls, catalog_type=daophot_type, module=module, bgsub=bgsub, desat=desat, epsf=epsf, target=target,
-                   blur=blur,
+                   blur=blur, indivexp=indivexp,
                    basepath=basepath)
 
 
@@ -723,6 +743,7 @@ def flag_near_saturated(cat, filtername, radius=None, target='brick',
 def replace_saturated(cat, filtername, radius=None, target='brick',
                       basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     satstar_cat_fn = f'{basepath}/{filtername.upper()}/pipeline/jw0{filter_to_project[filtername.lower()]}-o{project_obsnum[target][filter_to_project[filtername.lower()]]}_t001_nircam_clear-{filtername}-merged_i2d_satstar_catalog.fits'
+    print(f"Saturated star catalog is {satstar_cat_fn}")
     satstar_cat = Table.read(satstar_cat_fn)
     satstar_coords = satstar_cat['skycoord_fit']
 
@@ -750,8 +771,11 @@ def replace_saturated(cat, filtername, radius=None, target='brick',
     filtername = cat.meta['filter']
     zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.{filtername.upper()}']['ZeroPoint'], u.Jy)
 
-    flux_jy = (satstar_cat['flux_fit'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * fwhm**2).to(u.Jy)
-    eflux_jy = (satstar_cat['flux_unc'] * u.MJy/u.sr * (2*np.pi / (8*np.log(2))) * fwhm**2).to(u.Jy)
+    flux_jy = (satstar_cat['flux_fit'] * u.MJy/u.sr * cat.meta['pixelscale_deg2']).to(u.Jy)
+    try:
+        eflux_jy = (satstar_cat['flux_err'] * u.MJy/u.sr * cat.meta['pixelscale_deg2']).to(u.Jy)
+    except KeyError:
+        eflux_jy = (satstar_cat['flux_unc'] * u.MJy/u.sr * cat.meta['pixelscale_deg2']).to(u.Jy)
     abmag = -2.5*np.log10(flux_jy / zeropoint)
     abmag_err = 2.5 / np.log(10) * np.abs(eflux_jy / flux_jy)
     satstar_cat['mag_ab'] = abmag
@@ -759,21 +783,32 @@ def replace_saturated(cat, filtername, radius=None, target='brick',
 
     idx_cat, idx_sat, sep, _ = satstar_coords.search_around_sky(cat_coords, radius)
 
-
     replaced_sat = np.zeros(len(cat), dtype='bool')
     replaced_sat[idx_cat] = True
+
+    if 'flux_err' in satstar_cat.colnames:
+        flux_err_colname = 'flux_err'
+        xerr_colname = 'x_err'
+        yerr_colname = 'y_err'
+    elif 'flux_unc' in satstar_cat.colnames:
+        flux_err_colname = 'flux_unc'
+        xerr_colname = 'x_0_unc'
+        yerr_colname = 'y_0_unc'
+    else:
+        print(satstar_cat.colnames)
+        raise KeyError("Missing flux error column")
 
     if 'flux' in cat.colnames:
 
         cat['flux'][idx_cat] = satstar_cat['flux_fit'][idx_sat]
-        cat['dflux'][idx_cat] = satstar_cat['flux_unc'][idx_sat]
+        cat['dflux'][idx_cat] = satstar_cat[flux_err_colname][idx_sat]
         cat['skycoord'][idx_cat] = satstar_cat['skycoord_fit'][idx_sat]
         if 'x' in cat.colnames:
             # the merged, individual field catalogs don't have these
             cat['x'][idx_cat] = satstar_cat['x_fit'][idx_sat]
             cat['y'][idx_cat] = satstar_cat['y_fit'][idx_sat]
-            cat['dx'][idx_cat] = satstar_cat['x_0_unc'][idx_sat]
-            cat['dy'][idx_cat] = satstar_cat['y_0_unc'][idx_sat]
+            cat['dx'][idx_cat] = satstar_cat[xerr_colname][idx_sat]
+            cat['dy'][idx_cat] = satstar_cat[yerr_colname][idx_sat]
 
         cat['mag_ab'][idx_cat] = abmag[idx_sat]
         cat['emag_ab'][idx_cat] = abmag_err[idx_sat]
@@ -784,13 +819,13 @@ def replace_saturated(cat, filtername, radius=None, target='brick',
         satstar_toadd = satstar_cat[satstar_not_inc]
 
         satstar_toadd.rename_column('flux_fit', 'flux')
-        satstar_toadd.rename_column('flux_unc', 'dflux')
+        satstar_toadd.rename_column(flux_err_colname, 'dflux')
         satstar_toadd.rename_column('skycoord_fit', 'skycoord')
         if 'x' in cat.colnames:
             satstar_toadd.rename_column('x_fit', 'x')
             satstar_toadd.rename_column('y_fit', 'y')
-            satstar_toadd.rename_column('x_0_unc', 'dx')
-            satstar_toadd.rename_column('y_0_unc', 'dy')
+            satstar_toadd.rename_column(xerr_colname, 'dx')
+            satstar_toadd.rename_column(yerr_colname, 'dy')
 
         for colname in cat.colnames:
             if colname not in satstar_toadd.colnames:
@@ -802,17 +837,15 @@ def replace_saturated(cat, filtername, radius=None, target='brick',
         for row in satstar_toadd:
             cat.add_row(dict(row))
 
-
-
     elif 'flux_fit' in cat.colnames:
         # DAOPHOT
         cat['flux_fit'][idx_cat] = satstar_cat['flux_fit'][idx_sat]
-        cat['flux_err'][idx_cat] = satstar_cat['flux_unc'][idx_sat]
+        cat['flux_err'][idx_cat] = satstar_cat[flux_err_colname][idx_sat]
         cat['skycoord'][idx_cat] = satstar_cat['skycoord_fit'][idx_sat]
         cat['x_fit'][idx_cat] = satstar_cat['x_fit'][idx_sat]
         cat['y_fit'][idx_cat] = satstar_cat['y_fit'][idx_sat]
-        cat['x_err'][idx_cat] = satstar_cat['x_0_unc'][idx_sat]
-        cat['y_err'][idx_cat] = satstar_cat['y_0_unc'][idx_sat]
+        cat['x_err'][idx_cat] = satstar_cat[xerr_colname][idx_sat]
+        cat['y_err'][idx_cat] = satstar_cat[yerr_colname][idx_sat]
 
         cat['mag_ab'][idx_cat] = abmag[idx_sat]
         cat['emag_ab'][idx_cat] = abmag_err[idx_sat]
@@ -898,10 +931,15 @@ def main():
                         for blur in (False, True):
 
                             if options.merge_singlefields:
+                                singlefield_done = False
                                 for suffix in ('_nsky0', ):
                                     for progid in obs_filters[target]:
-                                        for index, filtername in enumerate(obs_filters[target][progid]):
-
+                                        for filtername in (obs_filters[target][progid]):
+                                            if singlefield_done:
+                                                # skip ahead to merge-all-indiv step
+                                                continue
+                                            index += 1
+                                            print(index, filtername, progid, suffix)
                                             # enable array jobs based only on filters
                                             if os.getenv('SLURM_ARRAY_TASK_ID') is not None and int(os.getenv('SLURM_ARRAY_TASK_ID')) != index:
                                                 print(f'Task={os.getenv("SLURM_ARRAY_TASK_ID")} does not match index {index}')
@@ -920,7 +958,8 @@ def main():
                                                                                     target=target,
                                                                                     exposure_numbers=np.arange(1, options.max_expnum + 1),
                                                                                     basepath=basepath)
-                                                break
+                                                print(f"Finished merge_crowdsource_individual_frames {suffix} {progid} {filtername}")
+                                                singlefield_done = True
                                             except Exception as ex:
                                                 print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                                                 exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -933,7 +972,6 @@ def main():
                             if os.getenv('SLURM_ARRAY_TASK_ID') is not None and int(os.getenv('SLURM_ARRAY_TASK_ID')) != index:
                                 print(f'Task={os.getenv("SLURM_ARRAY_TASK_ID")} does not match index {index}')
                                 continue
-
 
                             t0 = time.time()
                             print(f"Index {index}")
@@ -954,7 +992,7 @@ def main():
                                     print(f"Exception for unweighted crowdsource: {ex}, {type(ex)}, {str(ex)}")
                                     #raise ex
                                 try:
-                                    for suffix in ("_nsky0", "_nsky1", ):#"_nsky15"):
+                                    for suffix in ("_nsky0", ):#"_nsky15"): "_nsky1", 
                                         print(f'crowdsource {suffix} {module}')
                                         merge_crowdsource(module=module, suffix=suffix, desat=desat, bgsub=bgsub, epsf=epsf,
                                                           fitpsf=fitpsf, target=target, basepath=basepath, blur=blur, indivexp=options.merge_singlefields)
@@ -962,6 +1000,7 @@ def main():
                                     print(f"Exception: {ex}, {type(ex)}, {str(ex)}")
                                     exc_type, exc_obj, exc_tb = sys.exc_info()
                                     print(f"Exception occurred on line {exc_tb.tb_lineno}")
+                                    raise ex
 
                                 print(f'crowdsource phase done.  time elapsed={time.time()-t0}')
 

@@ -47,50 +47,57 @@ else:
     reftb_vvv.write(vvvfn, overwrite=True)
     reftb_vvv.write(vvvfn.replace(".ecsv", ".fits"), overwrite=True)
 
-vvv_reference_coordinates = reference_coordinates = reftb_vvv['skycoord']
 
-f200tb = Table.read(f'{basepath}/catalogs/jw01182-o004_t001_nircam_clear-f200w-merged_cat_20240302.ecsv')
-mag200 = f200tb['aper_total_vegamag']
-skycrds_f200 = f200tb['sky_centroid']
+for reftbfn, reftbname in ((vvvfn, 'VVV'),
+                           (f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.fits', 'F405ref'),
+                           ):
+    print()
+    print(reftbname)
+    reftb = Table.read(reftbfn)
+    reference_coordinates = reftb['skycoord']
 
-idx, sidx, sep, sep3d = vvv_reference_coordinates.search_around_sky(skycrds_f200, 0.5*u.arcsec)
-idx_sel = np.isin(np.arange(len(f200tb)), idx)
-dra = (skycrds_f200[idx].ra - vvv_reference_coordinates[sidx].ra).to(u.arcsec)
-ddec = (skycrds_f200[idx].dec - vvv_reference_coordinates[sidx].dec).to(u.arcsec)
-closeneighbors_idx, closest_sep, _ = skycrds_f200.match_to_catalog_sky(skycrds_f200, 2)
+    if reftbname == 'VVV':
+        vvv_reference_coordinates = reference_coordinates = reftb_vvv['skycoord']
 
-# select only sources close enough in magnitude
-magmatch = np.abs(reftb_vvv['Ksmag3'][sidx] - mag200[idx]) < 0.5
+        f200tb = Table.read(f'{basepath}/catalogs/jw01182-o004_t001_nircam_clear-f200w-merged_cat_20240302.ecsv')
+        mag200 = f200tb['aper_total_vegamag']
+        skycrds_f200 = f200tb['sky_centroid']
 
-# ignore sources where there are multiple JWST sources close to each other (confusion)
-not_closesel = (closest_sep > 0.5*u.arcsec)
+        idx, sidx, sep, sep3d = vvv_reference_coordinates.search_around_sky(skycrds_f200, 0.5*u.arcsec)
+        idx_sel = np.isin(np.arange(len(f200tb)), idx)
+        dra = (skycrds_f200[idx].ra - vvv_reference_coordinates[sidx].ra).to(u.arcsec)
+        ddec = (skycrds_f200[idx].dec - vvv_reference_coordinates[sidx].dec).to(u.arcsec)
+        closeneighbors_idx, closest_sep, _ = skycrds_f200.match_to_catalog_sky(skycrds_f200, 2)
 
-sel = (not_closesel[idx]) & magmatch
-print(f"Selected {sel.sum()} reference source matching between VVV & F200W")
+        # select only sources close enough in magnitude
+        magmatch = np.abs(reftb_vvv['Ksmag3'][sidx] - mag200[idx]) < 0.5
 
-# downselect to only the coordinates we expect to have good matches
-reference_coordinates = vvv_reference_coordinates[sidx][sel]
-print(f"There are {len(reference_coordinates)} reference coordinates out of {len(reftb_vvv)} in the reference catalog.")
+        # ignore sources where there are multiple JWST sources close to each other (confusion)
+        not_closesel = (closest_sep > 0.5*u.arcsec)
 
-# write out downselected version so we can overplot it in CARTA
-reftb_vvv[sidx][sel].write('/orange/adamginsburg/jwst/brick/catalogs/jw01182-o004_t001_nircam_clear-f200w-merged_cat_20240302_downsel.fits',
-                       overwrite=True)
+        sel = (not_closesel[idx]) & magmatch
+        print(f"Selected {sel.sum()} reference source matching between VVV & F200W")
 
-# set 'flux' so we can compute ratio below.  Is arbitrary, but let's use VISTA values anyway
-# http://svo2.cab.inta-csic.es/theory/fps/index.php?id=Paranal/VISTA.Ks&&mode=browse&gname=Paranal&gname2=VISTA#filter
-reftb_vvv['flux'] = (10**(reftb_vvv['Ksmag3'] / 2.5) + 659.10)*u.Jy
+        # downselect to only the coordinates we expect to have good matches
+        reference_coordinates = vvv_reference_coordinates[sidx][sel]
+        print(f"There are {len(reference_coordinates)} reference coordinates out of {len(reftb_vvv)} in the reference catalog.")
 
-# for use below, needs to match reference_coordinates
-reftb = reftb_vvv[sidx][sel]
-print(f"reftb has length {len(reftb)}")
+        # write out downselected version so we can overplot it in CARTA
+        reftb_vvv[sidx][sel].write('/orange/adamginsburg/jwst/brick/catalogs/jw01182-o004_t001_nircam_clear-f200w-merged_cat_20240302_downsel.fits',
+                            overwrite=True)
 
-# undo all that work above: just accept _all_ VVV sources (and handle rejection below?)
-reftb = reftb_vvv
-reference_coordinates = vvv_reference_coordinates
-print(f"reftb has length {len(reftb)}")
+        # set 'flux' so we can compute ratio below.  Is arbitrary, but let's use VISTA values anyway
+        # http://svo2.cab.inta-csic.es/theory/fps/index.php?id=Paranal/VISTA.Ks&&mode=browse&gname=Paranal&gname2=VISTA#filter
+        reftb_vvv['flux'] = (10**(reftb_vvv['Ksmag3'] / 2.5) + 659.10)*u.Jy
 
+        # for use below, needs to match reference_coordinates
+        reftb = reftb_vvv[sidx][sel]
+        print(f"reftb has length {len(reftb)}")
 
-if True:
+        # undo all that work above: just accept _all_ VVV sources (and handle rejection below?)
+        reftb = reftb_vvv
+        reference_coordinates = vvv_reference_coordinates
+        print(f"reftb has length {len(reftb)}")
 
     rows = []
 
@@ -99,27 +106,57 @@ if True:
         for filtername in 'F200W,F356W,F444W,F115W'.split(","):
             for visit in ('002', '001'):
                 print(f"Working on filter {filtername}")
-                globstr = f"{basepath}/{filtername}/pipeline/jw{project_id}{obsid}{visit}_*nrc*destreak_cat.fits"
-                flist = glob.glob(globstr)
-
+                print(f"{'filt':5s}, {'ab':3s}, {'expno':5s}, {'ttl_dra':15s}, {'ttl_ddec':15s}, {'med_dra':15s}, {'med_ddec':15s}, {'std_dra':15s}, {'std_dec':15s}, nmatch, nreject, niter")
+                # pipeline/tweakreg version globstr = f"{basepath}/{filtername}/pipeline/jw{project_id}{obsid}{visit}_*nrc*destreak_cat.fits"
+                # F405N/f405n_nrcb_visit001_exp00008_crowdsource_nsky0.fits
+                globstr = f"{basepath}/{filtername}/{filtername.lower()}_*visit{visit}*_exp*_crowdsource_nsky0.fits"
+                flist = sorted([x for x in glob.glob(globstr) if 'fitpsf' not in x])
 
                 if len(flist) == 0:
                     raise ValueError(f"No matches to {globstr}")
                 for fn in sorted(flist):
-                    ab = 'a' if 'nrca' in fn else 'b'
-                    module = f'nrc{ab}long' if 'long' in fn else f'nrc{ab}' + fn.split('nrc')[1][1]
-                    expno = fn.split("_")[2]
-                    visitname = os.path.basename(fn).split("_")[0]
 
-                    cat = ftb = Table.read(fn)
-                    try:
-                        fitsfn = fn.replace("_cat.fits", ".fits")
-                        ffh = fits.open(fitsfn)
-                    except FileNotFoundError:
-                        fitsfn = fn.replace("destreak_cat.fits", "cal.fits")
-                        ffh = fits.open(fitsfn)
+                    ab = 'a' if 'nrca' in fn else 'b'
+                    if filtername in ('F444W', 'F356W'):
+                        module = f'nrc{ab}long'
+                    else:
+                        ab += fn.split('nrc')[1][1]
+                        module = f'nrc{ab}'
+
+                    expno = fn.split("_")[3][-5:]
+                    # old version visitname = os.path.basename(fn).split("_")[2][-3:]
+                    visitname = f'jw01182004{visit}'
+
+                    cat = Table.read(fn)
+                    fitsfn = cat.meta['FILENAME']
+                    ffh = fits.open(fitsfn)
+
+                    if 'qf' in cat.colnames:
+                        sel = cat['qf'] > 0.95
+                        sel &= cat['fracflux'] > 0.8
+                        cat = cat[sel]
+
+                    # try:
+                    #     fitsfn = fn.replace("_cat.fits", ".fits")
+                    #     ffh = fits.open(fitsfn)
+                    # except FileNotFoundError:
+                    #     fitsfn = fn.replace("destreak_cat.fits", "cal.fits")
+                    #     ffh = fits.open(fitsfn)
 
                     header = ffh['SCI'].header
+
+                    ww = WCS(header)
+
+                    # start by shifting by measured offsets
+                    match = ((handmeasured_offsets['Visit'] == visitname) &
+                             (handmeasured_offsets['Exposure'] == int(expno)) &
+                             ((handmeasured_offsets['Module'] == module) | (handmeasured_offsets['Module'] == module.strip('1234'))) &
+                             (handmeasured_offsets['Filter'] == filtername)
+                            )
+                    assert match.sum() == 1
+                    handsel_row = handmeasured_offsets[match][0]
+                    dra_hand, ddec_hand = u.Quantity([handsel_row['dra (arcsec)'], handsel_row['ddec (arcsec)']], u.arcsec)
+                    ww.wcs.crval = ww.wcs.crval + [dra_hand.to(u.deg).value, ddec_hand.to(u.deg).value]
 
                     if 'RAOFFSET' in header:
                         raoffset = header['RAOFFSET']
@@ -127,27 +164,13 @@ if True:
                         print(f"Found RAOFFSET in header: {raoffset}, {decoffset}")
                         header['CRVAL1'] = header['OLCRVAL1']
                         header['CRVAL2'] = header['OLCRVAL2']
-
-
-                    ww = WCS(header)
-
-                    # start by shifting by measured offsets
-                    match = ((handmeasured_offsets['Visit'] == visitname) &
-                            (handmeasured_offsets['Exposure'] == int(expno)) &
-                            ((handmeasured_offsets['Module'] == module) | (handmeasured_offsets['Module'] == module.strip('1234'))) &
-                            (handmeasured_offsets['Filter'] == filtername)
-                            )
-                    assert match.sum() == 1
-                    handsel_row = handmeasured_offsets[match][0]
-                    dra_hand, ddec_hand = u.Quantity([handsel_row['dra (arcsec)'], handsel_row['ddec (arcsec)']], u.arcsec)
-                    ww.wcs.crval = ww.wcs.crval + [dra_hand.to(u.deg).value, ddec_hand.to(u.deg).value]
-
-                    print(fitsfn, fn)
-                    print(f"Shifted original WCS by {dra_hand}, {ddec_hand}")
-                    total_dra = dra_hand.to(u.arcsec)
-                    total_ddec = ddec_hand.to(u.arcsec)
-
-
+                        total_dra = raoffset*u.arcsec
+                        total_ddec = decoffset*u.arcsec
+                    else:
+                        #print(fitsfn, fn)
+                        #print(f"Shifted original WCS by {dra_hand}, {ddec_hand}")
+                        total_dra = dra_hand.to(u.arcsec)
+                        total_ddec = ddec_hand.to(u.arcsec)
 
                     skycrds_cat = ww.pixel_to_world(cat['x'], cat['y'])
 
@@ -171,7 +194,7 @@ if True:
 
                         ratio = cat['flux'][idx[keep]] / reftb['flux'][keep]
                         reject = np.zeros(ratio.size, dtype='bool')
-                        ii=0
+                        ii = 0
                         # rejecting based on flux may have failed?
                         if filtername == 'F200W':
                             # for the other filters, we don't expect any agreement at all
@@ -186,9 +209,9 @@ if True:
                                 ratio = 1 / ratio
 
 
-                        #idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat[sel], max_offset)
-                        #dra = (skycrds_cat[sel][idx[keep]].ra - reference_coordinates[keep].ra).to(u.arcsec)
-                        #ddec = (skycrds_cat[sel][idx[keep]].dec - reference_coordinates[keep].dec).to(u.arcsec)
+                        # idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat[sel], max_offset)
+                        # dra = (skycrds_cat[sel][idx[keep]].ra - reference_coordinates[keep].ra).to(u.arcsec)
+                        # ddec = (skycrds_cat[sel][idx[keep]].dec - reference_coordinates[keep].dec).to(u.arcsec)
 
                         # dra and ddec should be the vector added to CRVAL to put the image in the right place
                         dra = -(skycrds_cat[sel][idx[keep][~reject]].ra - reference_coordinates[keep][~reject].ra).to(u.arcsec)
@@ -211,16 +234,13 @@ if True:
                         total_ddec = total_ddec + med_ddec.to(u.arcsec)
 
                         ww.wcs.crval = ww.wcs.crval + [med_dra.to(u.deg).value, med_ddec.to(u.deg).value]
-                        print(f"{filtername:5s}, {ab}, {expno}, {total_dra:8.3f}, {total_ddec:8.3f}, {med_dra:8.3f}, {med_ddec:8.3f}, nmatch={keep.sum()}, nreject={reject.sum()} (n={ii}), niter={iteration}")
 
                         iteration += 1
                         if iteration > 50:
                             break # there is at least one case in which we converged to an oscillator
                             raise ValueError("Iteration is not converging")
 
-
-
-                    print(f"{filtername:5s}, {ab}, {expno}, {total_dra:8.3f}, {total_ddec:8.3f}, {med_dra:8.3f}, {med_ddec:8.3f}, nmatch={keep.sum()}, nreject={reject.sum()} (n={ii}), niter={iteration}")
+                    print(f"{filtername:5s}, {ab:3s}, {expno:5s}, {total_dra:8.3f}, {total_ddec:8.3f}, {med_dra:8.3f}, {med_ddec:8.3f}, {std_dra:8.3f}, {std_ddec:8.3f}, {keep.sum():6d}, {reject.sum():7d}, niter={iteration:5d} [dra_hand={dra_hand}, ddec_hand={ddec_hand}]")
                     if keep.sum() < 5:
                         print(fitsfn)
                         print(fn)
@@ -228,8 +248,8 @@ if True:
 
                     rows.append({
                         'Filename': fn,
-                        #'Test': os.path.basename(fn),
-                        #'Filename_1': os.path.basename(fn),
+                        # 'Test': os.path.basename(fn),
+                        # 'Filename_1': os.path.basename(fn),
                         'dra': total_dra,
                         'ddec': total_ddec,
                         'dra (arcsec)': total_dra,
@@ -239,17 +259,16 @@ if True:
                         'Visit': visitname,
                         'visitnumber': visit,
                         'obsid': obsid,
-                        "Group": os.path.basename(fn).split("_")[1],
+                        # "Group": os.path.basename(fn).split("_")[1],
                         "Exposure": int(expno),
                         "Filter": filtername,
                         "Module": module
                     })
 
     tbl = Table(rows)
-    # don't necessarily want to write this: if the manual alignment has been run already, the offsets will all be zero
-    tbl.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_VVV.csv", format='ascii.csv', overwrite=True)
+    tbl.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_{reftbname}.csv", format='ascii.csv', overwrite=True)
 
-    # TODO: aggregate with weighted mean
+    # TODO: aggregate with weighted mean (or maybe we don't wnat that...)
 
     gr = tbl.group_by(['Filter', 'Module', 'Visit'])
     agg = gr.groups.aggregate(np.mean)
@@ -260,5 +279,5 @@ if True:
     agg['ddec_rms'] = aggstd['ddec']
     agg['dra_med'] = aggmed['dra']
     agg['ddec_med'] = aggmed['ddec']
-    agg.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_VVV_average.csv", format='ascii.csv', overwrite=True)
+    agg.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_{reftbname}_average.csv", format='ascii.csv', overwrite=True)
 

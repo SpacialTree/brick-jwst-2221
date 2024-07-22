@@ -2,8 +2,20 @@ import glob
 from astropy.io import fits
 from scipy.ndimage import label, find_objects, center_of_mass, sum_labels
 from astropy.modeling.fitting import LevMarLSQFitter
-from photutils.psf import DAOGroup, IntegratedGaussianPRF, extract_stars, IterativelySubtractedPSFPhotometry, BasicPSFPhotometry
-from photutils.psf.utils import subtract_psf
+
+try:
+    # version >=1.7.0, doesn't work: the PSF is broken (https://github.com/astropy/photutils/issues/1580?)
+    from photutils.psf import PSFPhotometry, IterativePSFPhotometry, SourceGrouper
+except:
+    # version 1.6.0, which works
+    from photutils.psf import BasicPSFPhotometry as PSFPhotometry, IterativelySubtractedPSFPhotometry as IterativePSFPhotometry, DAOGroup as SourceGrouper
+try:
+    from photutils.background import MMMBackground, MADStdBackgroundRMS, MedianBackground, Background2D, LocalBackground
+except:
+    from photutils.background import MMMBackground, MADStdBackgroundRMS, MedianBackground, Background2D
+    from photutils.background import MMMBackground as LocalBackground
+
+
 from tqdm.notebook import tqdm
 from tqdm import tqdm
 from astropy import wcs
@@ -263,7 +275,7 @@ def iteratively_remove_saturated_stars(data, header,
     #big_grid.fixed['x_0'] = True
     #big_grid.fixed['y_0'] = True
 
-    daogroup = DAOGroup(crit_separation=8)
+    daogroup = SourceGrouper(min_separation=8)
 
     resid = data
 
@@ -305,14 +317,15 @@ def iteratively_remove_saturated_stars(data, header,
         if verbose:
             print(f"Before BasicPSFPhotometry: {len(sources)} sources.  min,max sz: {minsz,maxsz}  minflx={minflx}, grad={grad}, fitsz={fitsz}, apsz={apsz}, diliter={diliter}")
 
-        phot = BasicPSFPhotometry(finder=finder,
-                                  group_maker=daogroup,
-                                  bkg_estimator=None, # must be none or it un-saturates pixels
-                                  #psf_model=epsf_model,
-                                  psf_model=big_grid,
-                                  fitter=lmfitter,
-                                  fitshape=fitsz,
-                                  aperture_radius=apsz*fwhm_pix)
+        phot = PSFPhotometry(finder=finder,
+                             grouper=daogroup,
+                             localbkg_estimator=None, # must be none or it un-saturates pixels
+                             #psf_model=epsf_model,
+                             psf_model=big_grid,
+                             fitter=lmfitter,
+                             fit_shape=fitsz,
+                             aperture_radius=apsz*fwhm_pix,
+                             )
 
         # Mask out the inner portion of the PSF when fitting it
         if diliter > 0:
@@ -335,9 +348,8 @@ def iteratively_remove_saturated_stars(data, header,
 
         # manually subtract off PSFs because get_residual_image seems to (never?) work
         # (it might work but I just had other errors masking that it was working, but this is fine - it's just more manual steps)
-
-        resid = subtract_psf(resid, phot.psf_model, result['x_fit', 'y_fit', 'flux_fit'], subshape=phot.fitshape)
-        #resid = phot.get_residual_image()
+        #resid = subtract_psf(resid, phot.psf_model, result['x_fit', 'y_fit', 'flux_fit'], subshape=phot.fitshape)
+        resid = phot.make_residual_image(resid, (fitsz, fitsz), include_localbkg=False)
 
         # reset saturated pixels back to zero
         resid[satpix] = 0
@@ -348,6 +360,7 @@ def iteratively_remove_saturated_stars(data, header,
     final_table = table.vstack(results)
 
     return final_table, resid
+
 
 def remove_saturated_stars(filename, save_suffix='_unsatstar', **kwargs):
     fh = fits.open(filename)
@@ -367,6 +380,7 @@ def remove_saturated_stars(filename, save_suffix='_unsatstar', **kwargs):
     fh['SCI'].data = satstar_resid
     fh.writeto(filename.replace(".fits", save_suffix+".fits"), overwrite=True)
 
+
 def main():
 
     with open(os.path.expanduser('/home/adamginsburg/.mast_api_token'), 'r') as fh:
@@ -378,6 +392,7 @@ def main():
     for module in ('nrca', 'nrcb', 'merged'):
         for fn in glob.glob(f"/orange/adamginsburg/jwst/brick/F*/pipeline/*-{module}_i2d.fits"):
             remove_saturated_stars(fn)
+
 
 if __name__ == "__main__":
     main()

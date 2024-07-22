@@ -210,9 +210,15 @@ def cmds(basetable, sel=True,
         ax.set_ylabel(f"{f1}")
         ax.axis(axlims)
         if xlim_percentiles:
-            xlow = np.nanpercentile(colorp[include], xlim_percentiles[0])
-            xhigh = np.nanpercentile(colorp[include], xlim_percentiles[1])
-            ax.set_xlim(xlow, xhigh)
+            try:
+                xlow = np.nanpercentile(colorp[include], xlim_percentiles[0])
+                xhigh = np.nanpercentile(colorp[include], xlim_percentiles[1])
+                if np.isfinite(xlow) and np.isfinite(xhigh):
+                    ax.set_xlim(xlow, xhigh)
+                else:
+                    print(f"xlow={xlow} xhigh={xhigh}")
+            except Exception as ex:
+                print(ex)
 
         if ext is not None:
             w1 = 4.10*u.um if f1 == '410m405' else 4.05*u.um if f1 == '405m410' else int(f1[1:-1])/100*u.um
@@ -497,7 +503,8 @@ def ccds_withiso(basetable, sel=True,
 
 def xmatch_plot(basetable, ref_filter='f405n', filternames=filternames,
                 maxsep=0.13*u.arcsec, obsid='001', sel=None, axlims=[-0.5, 0.5, -0.5, 0.5],
-                regs=['brick_nrca.reg', 'brick_nrcb.reg'], module='merged-reproject', save_output=False):
+                alpha=0.01,
+                regs=['brick_nrca.reg', 'brick_nrcb.reg']):
     statsd = {}
     fig1 = pl.figure(1)
     fig2 = pl.figure(2)
@@ -532,14 +539,14 @@ def xmatch_plot(basetable, ref_filter='f405n', filternames=filternames,
         ok = (sep < maxsep) & (sep > 0)
         print(f"For filter {filtername}, found {ok.sum()} out of {len(ok)} data points")
 
-        ax.scatter(radiff, decdiff, marker=',', s=1, alpha=0.1)
+        ax.scatter(radiff, decdiff, marker=',', s=1, alpha=alpha)
         if regs is None:
-            ax.scatter(radiff[ok], decdiff[ok], marker=',', s=1, alpha=0.1)
+            ax.scatter(radiff[ok], decdiff[ok], marker=',', s=1, alpha=alpha)
         else:
             for reg in regs:
                 reg = regions.Regions.read(f'{basepath}/regions_/{reg}')[0]
                 match = reg.contains(crds, refwcs)
-                ax.scatter(radiff[ok & match], decdiff[ok & match], marker=',', s=1, alpha=0.1)
+                ax.scatter(radiff[ok & match], decdiff[ok & match], marker=',', s=1, alpha=alpha)
 
         ax.axis(axlims)
         ax.set_title(filtername)
@@ -549,7 +556,7 @@ def xmatch_plot(basetable, ref_filter='f405n', filternames=filternames,
         #ax2.set_xlabel("Separation (\")")
         ax2.set_title(filtername)
 
-        print(f"sep: {sep}, std(sep): {np.std(sep)}")
+        print(f"med sep: {np.median(sep)}, std(sep): {np.std(sep)}")
         statsd[filtername] = {
             'med': np.median(sep),
             'mad': stats.mad_std(sep.copy()),
@@ -1080,19 +1087,28 @@ def diagnostic_stamps_by_mag_crowdsource(*args, **kwargs):
     return diagnostic_stamps_by_mag(*args, **kwargs, flux_kw='flux', dao=False)
 
 
-def diagnostic_stamps_by_mag(result, residual, pixel_area, filtername, data, sz=7, ind_offset=0, flux_kw='flux_fit', dao=True):
+def diagnostic_stamps_by_mag(result, residual, pixel_area, filtername, data, sz=7, ind_offset=0, flux_kw='flux_fit', dao=True, min_qf=None, min_fracflux=None,
+                             max_mag=17, min_mag=12, mag_decrement=-0.5):
     flux_jy = (result[flux_kw] * u.MJy/u.sr * pixel_area).to(u.Jy)
     jfilts = SvoFps.get_filter_list('JWST')
     jfilts.add_index('filterID')
     zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.{filtername.upper()}']['ZeroPoint'], u.Jy)
-    abmag = -2.5 * np.log10(flux_jy / zeropoint)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        abmag = -2.5 * np.log10(flux_jy / zeropoint)
 
-    magbins = np.arange(17, 12.0, -0.5)
+    magbins = np.arange(max_mag, min_mag, mag_decrement)
     ncol = len(magbins)
 
-    pl.figure(figsize=(20,5))
+    pl.figure(figsize=(20, 5))
     for ii, mag in enumerate(magbins):
         sel = (abmag > mag-0.5) & (abmag <= mag)
+
+        if min_qf is not None:
+            sel &= result['qf'] > min_qf
+        if min_fracflux is not None:
+            sel &= result['fracflux'] > min_fracflux
+
         n = sel.sum()
         try:
             row = result[sel][int(n/2)+ind_offset]
