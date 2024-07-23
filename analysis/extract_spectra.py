@@ -22,13 +22,13 @@ def extract_spec(cube, pos, rad):
     return average_spectrum
 
 def extract_spectrum(obj, fn, line_name='HNCO', restfreq=87.925238*u.GHz):
-    cube = SpectralCube.read(fn)
+    cube = SpectralCube.read(fn, format='fits')
     cube = cube.with_spectral_unit(u.km/u.s, velocity_convention='radio', rest_value=restfreq)
     pos = SkyCoord(obj['ra'], obj['dec'], unit=(u.hourangle, u.deg))
     rad = obj['rad']*u.arcsec
     average_spectrum = extract_spec(cube, pos, rad)
-    average_spectrum.write(f'/orange/adamginsburg/jwst/cloudc/alma/spectra/spectrum_{obj["name"]}_{line_name}.fits', overwrite=True)
-    #return average_spectrum
+    average_spectrum.write(f'/orange/adamginsburg/jwst/cloudc/alma/spectra/spectrum_{obj["name"]}_{line_name}.fits', overwrite=True, format='fits')
+    return average_spectrum
 
 cloudc1 = {'name': 'cloudc1', 'ra': '17:46:21.3048683891', 'dec': '-28:35:33.1211282499', 'rad': 30}
 cloudc2 = {'name': 'cloudc2', 'ra': '17:46:18.3316118680', 'dec': '-28:34:48.4717811920', 'rad': 30}
@@ -47,7 +47,7 @@ extract_spectrum(cloudc2, fn_12CO, line_name='12CO-BEARS', restfreq=1.1527120400
 # Cloud d
 extract_spectrum(cloudd, fn_12CO, line_name='12CO-BEARS', restfreq=1.152712040000E+11*u.Hz)
 # Filament
-extract_spectrum(filament, fn_12CO, line_name='12CO-BEARS', restfreq=1.152712040000E+11*u.Hz)
+fil_spec = extract_spectrum(filament, fn_12CO, line_name='12CO-BEARS', restfreq=1.152712040000E+11*u.Hz)
 
 ## HNCO
 # Cloud c1
