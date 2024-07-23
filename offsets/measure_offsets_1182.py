@@ -76,7 +76,7 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
         not_closesel = (closest_sep > 0.5*u.arcsec)
 
         sel = (not_closesel[idx]) & magmatch
-        print(f"Selected {sel.sum()} reference source matching between VVV & F200W")
+        print(f"Selected {sel.sum()} reference source matching between VVV & F200W", flush=True)
 
         # downselect to only the coordinates we expect to have good matches
         reference_coordinates = vvv_reference_coordinates[sidx][sel]
@@ -164,13 +164,11 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
                         print(f"Found RAOFFSET in header: {raoffset}, {decoffset}")
                         header['CRVAL1'] = header['OLCRVAL1']
                         header['CRVAL2'] = header['OLCRVAL2']
-                        total_dra = raoffset*u.arcsec
-                        total_ddec = decoffset*u.arcsec
-                    else:
-                        #print(fitsfn, fn)
-                        #print(f"Shifted original WCS by {dra_hand}, {ddec_hand}")
-                        total_dra = dra_hand.to(u.arcsec)
-                        total_ddec = ddec_hand.to(u.arcsec)
+
+                    # print(fitsfn, fn)
+                    # print(f"Shifted original WCS by {dra_hand}, {ddec_hand}")
+                    total_dra = dra_hand.to(u.arcsec)
+                    total_ddec = ddec_hand.to(u.arcsec)
 
                     skycrds_cat = ww.pixel_to_world(cat['x'], cat['y'])
 
@@ -208,7 +206,6 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
                                 reject = (ratio < med - 5 * madstd) | (ratio > med + 5 * madstd) | reject
                                 ratio = 1 / ratio
 
-
                         # idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat[sel], max_offset)
                         # dra = (skycrds_cat[sel][idx[keep]].ra - reference_coordinates[keep].ra).to(u.arcsec)
                         # ddec = (skycrds_cat[sel][idx[keep]].dec - reference_coordinates[keep].dec).to(u.arcsec)
@@ -240,7 +237,7 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
                             break # there is at least one case in which we converged to an oscillator
                             raise ValueError("Iteration is not converging")
 
-                    print(f"{filtername:5s}, {ab:3s}, {expno:5s}, {total_dra:8.3f}, {total_ddec:8.3f}, {med_dra:8.3f}, {med_ddec:8.3f}, {std_dra:8.3f}, {std_ddec:8.3f}, {keep.sum():6d}, {reject.sum():7d}, niter={iteration:5d} [dra_hand={dra_hand}, ddec_hand={ddec_hand}]")
+                    print(f"{filtername:5s}, {ab:3s}, {expno:5s}, {total_dra:8.3f}, {total_ddec:8.3f}, {med_dra:8.3f}, {med_ddec:8.3f}, {std_dra:8.3f}, {std_ddec:8.3f}, {keep.sum():6d}, {reject.sum():7d}, niter={iteration:5d} [dra_hand={dra_hand}, ddec_hand={ddec_hand}]", flush=True)
                     if keep.sum() < 5:
                         print(fitsfn)
                         print(fn)
@@ -262,7 +259,7 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
                         # "Group": os.path.basename(fn).split("_")[1],
                         "Exposure": int(expno),
                         "Filter": filtername,
-                        "Module": module
+                        "Module": module,
                     })
 
     tbl = Table(rows)
@@ -280,4 +277,3 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
     agg['dra_med'] = aggmed['dra']
     agg['ddec_med'] = aggmed['ddec']
     agg.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_{reftbname}_average.csv", format='ascii.csv', overwrite=True)
-
