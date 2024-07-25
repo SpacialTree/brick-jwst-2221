@@ -178,6 +178,8 @@ def catalog_zoom_diagnostic(data, modsky, zoomcut, stars):
 
     resid = (data[zoomcut] - modsky[zoomcut])
     rms = stats.mad_std(resid, ignore_nan=True)
+    if np.isnan(rms):
+        raise ValueError("RMS is nan, this shouldn't happen")
 
     norm = (simple_norm(resid, stretch='asinh', max_percent=99.95, min_percent=0.5)
             if np.nanmin(resid) > 0 else
@@ -941,6 +943,13 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
             result.meta['exposure'] = exposure_
         result.meta['pixscale'] = (ww.proj_plane_pixel_area()**0.5).value
         result.meta['pixscale_as'] = (ww.proj_plane_pixel_area()**0.5).to(u.arcsec).value
+        result.meta['filename'] = filename
+        result.meta['filter'] = filtername
+        result.meta['module'] = module
+        result.meta['detector'] = detector
+        result.meta['pixscale'] = pixscale.to(u.deg).value
+        result.meta['pixscale_as'] = pixscale.value
+
         result.write(basic_daophot_catalog_fn, overwrite=True)
         print(f"Completed BASIC photometry, and wrote out file {basic_daophot_catalog_fn}")
 
@@ -1051,6 +1060,15 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
         result2['skycoord_centroid'] = coords2
         if options.each_exposure:
             result2.meta['exposure'] = exposure_
+        result.meta['pixscale'] = (ww.proj_plane_pixel_area()**0.5).value
+        result.meta['pixscale_as'] = (ww.proj_plane_pixel_area()**0.5).to(u.arcsec).value
+        result.meta['filename'] = filename
+        result.meta['filter'] = filtername
+        result.meta['module'] = module
+        result.meta['detector'] = detector
+        result.meta['pixscale'] = pixscale.to(u.deg).value
+        result.meta['pixscale_as'] = pixscale.value
+
         print(f'len(result2) = {len(result2)}, len(coords) = {len(coords2)}', flush=True)
         result2.write(f"{basepath}/{filtername}/{filtername.lower()}"
                       f"_{module}{detector}{visitid_}{exposure_}{desat}{bgsub}{epsf_}{blur_}{group}"
