@@ -10,6 +10,7 @@ from astroquery.vizier import Vizier
 from astropy.coordinates import SkyCoord
 import glob
 import os
+from measure_offsets import measure_offsets
 
 project_id = '01182'
 field = '004'
@@ -34,11 +35,11 @@ else:
     Vizier.ROW_LIMIT = 1e5
     coord = SkyCoord(266.534963671, -28.710074995, unit=(u.deg, u.deg), frame='fk5')
     reftb_vvv = Vizier.query_region(coordinates=coord,
-                                 width=7*u.arcmin,
-                                 height=7*u.arcmin,
-                                 catalog=['II/348/vvv2'])[0]
-    reftb_vvv['RA'] = reftb_vvv['RAJ2000']
-    reftb_vvv['DEC'] = reftb_vvv['DEJ2000']
+                                    width=7*u.arcmin,
+                                    height=7*u.arcmin,
+                                    catalog=['II/364/virac'])[0]
+    reftb_vvv['RA'] = reftb_vvv['RA_ICRS']
+    reftb_vvv['DEC'] = reftb_vvv['DE_ICRS']
 
     # FK5 because it says 'J2000' on the Vizier page (same as twomass)
     reftb_vvv_crds = SkyCoord(reftb_vvv['RAJ2000'], reftb_vvv['DEJ2000'], frame='fk5')
@@ -48,8 +49,11 @@ else:
     reftb_vvv.write(vvvfn.replace(".ecsv", ".fits"), overwrite=True)
 
 
-for reftbfn, reftbname in ((vvvfn, 'VVV'),
+for reftbfn, reftbname in (
+                           (f'{basepath}/catalogs/dao_basic_based_nircam-f444w_reference_astrometric_catalog.fits', 'F444ref'),
                            (f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.fits', 'F405ref'),
+                           (vvvfn, 'VVV'),
+                           ('/blue/adamginsburg/adamginsburg/jwst/brick//catalogs/f200w_merged_indivexp_merged_dao_basic.fits', 'F200ref'),
                            ):
     print()
     print(reftbname)
@@ -65,15 +69,16 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
 
         idx, sidx, sep, sep3d = vvv_reference_coordinates.search_around_sky(skycrds_f200, 0.5*u.arcsec)
         idx_sel = np.isin(np.arange(len(f200tb)), idx)
-        dra = (skycrds_f200[idx].ra - vvv_reference_coordinates[sidx].ra).to(u.arcsec)
-        ddec = (skycrds_f200[idx].dec - vvv_reference_coordinates[sidx].dec).to(u.arcsec)
+        # dra = (skycrds_f200[idx].ra - vvv_reference_coordinates[sidx].ra).to(u.arcsec)
+        # ddec = (skycrds_f200[idx].dec - vvv_reference_coordinates[sidx].dec).to(u.arcsec)
         closeneighbors_idx, closest_sep, _ = skycrds_f200.match_to_catalog_sky(skycrds_f200, 2)
 
         # select only sources close enough in magnitude
         magmatch = np.abs(reftb_vvv['Ksmag3'][sidx] - mag200[idx]) < 0.5
 
         # ignore sources where there are multiple JWST sources close to each other (confusion)
-        not_closesel = (closest_sep > 0.5*u.arcsec)
+        # I dropped this from 0.5 (VVV size) to 0.2 b/c magmatch should help and I wanted more sources
+        not_closesel = (closest_sep > 0.2*u.arcsec)
 
         sel = (not_closesel[idx]) & magmatch
         print(f"Selected {sel.sum()} reference source matching between VVV & F200W", flush=True)
@@ -103,10 +108,10 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
 
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        for filtername in 'F200W,F356W,F444W,F115W'.split(","):
+        for filtername in 'F444W,F200W,F356W,F115W'.split(","):
             for visit in ('002', '001'):
-                print(f"Working on filter {filtername}")
-                print(f"{'filt':5s}, {'ab':3s}, {'expno':5s}, {'ttl_dra':15s}, {'ttl_ddec':15s}, {'med_dra':15s}, {'med_ddec':15s}, {'std_dra':15s}, {'std_dec':15s}, nmatch, nreject, niter")
+                print(f"Working on filter {filtername} visit {visit} with reference table {reftbname}")
+                print(f"{'filt':5s}, {'ab':3s}, {'expno':5s}, {'ttl_dra':8s}, {'ttl_ddec':8s}, {'med_dra':8s}, {'med_ddec':8s}, {'std_dra':8s}, {'std_dec':8s}, nmatch, nreject, niter")
                 # pipeline/tweakreg version globstr = f"{basepath}/{filtername}/pipeline/jw{project_id}{obsid}{visit}_*nrc*destreak_cat.fits"
                 # F405N/f405n_nrcb_visit001_exp00008_crowdsource_nsky0.fits
                 # globstr = f"{basepath}/{filtername}/{filtername.lower()}_*visit{visit}*_exp*_crowdsource_nsky0.fits"
@@ -138,43 +143,36 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
                         sel &= cat['fracflux'] > 0.8
                         cat = cat[sel]
                     elif 'qfit' in cat.colnames:
-                        sel = cat['qfit'] < 0.4
-                        sel &= cat['cfit'] < 0.4
+                        sel = cat['qfit'] < 0.1
+                        sel &= cat['cfit'] < 0.1
                         cat = cat[sel]
-
-                    # try:
-                    #     fitsfn = fn.replace("_cat.fits", ".fits")
-                    #     ffh = fits.open(fitsfn)
-                    # except FileNotFoundError:
-                    #     fitsfn = fn.replace("destreak_cat.fits", "cal.fits")
-                    #     ffh = fits.open(fitsfn)
 
                     header = ffh['SCI'].header
 
                     ww = WCS(header)
 
-                    # start by shifting by measured offsets
-                    match = ((handmeasured_offsets['Visit'] == visitname) &
-                             (handmeasured_offsets['Exposure'] == int(expno)) &
-                             ((handmeasured_offsets['Module'] == module) | (handmeasured_offsets['Module'] == module.strip('1234'))) &
-                             (handmeasured_offsets['Filter'] == filtername)
-                            )
-                    assert match.sum() == 1
-                    handsel_row = handmeasured_offsets[match][0]
-                    dra_hand, ddec_hand = u.Quantity([handsel_row['dra (arcsec)'], handsel_row['ddec (arcsec)']], u.arcsec)
-                    ww.wcs.crval = ww.wcs.crval + [dra_hand.to(u.deg).value, ddec_hand.to(u.deg).value]
-
                     if 'RAOFFSET' in header:
-                        raoffset = header['RAOFFSET']
-                        decoffset = header['DEOFFSET']
-                        print(f"Found RAOFFSET in header: {raoffset}, {decoffset}")
+                        raoffset = u.Quantity(header['RAOFFSET'], u.arcsec)
+                        decoffset = u.Quantity(header['DEOFFSET'], u.arcsec)
+                        # print(f"Found RAOFFSET in header: {raoffset}, {decoffset}")
                         header['CRVAL1'] = header['OLCRVAL1']
                         header['CRVAL2'] = header['OLCRVAL2']
-
-                    # print(fitsfn, fn)
-                    # print(f"Shifted original WCS by {dra_hand}, {ddec_hand}")
-                    total_dra = dra_hand.to(u.arcsec)
-                    total_ddec = ddec_hand.to(u.arcsec)
+                    elif handmeasured_offsets is not None:
+                        # start by shifting by measured offsets
+                        match = ((handmeasured_offsets['Visit'] == visitname) &
+                                 (handmeasured_offsets['Exposure'] == int(expno)) &
+                                 ((handmeasured_offsets['Module'] == module) | (handmeasured_offsets['Module'] == module.strip('1234'))) &
+                                 (handmeasured_offsets['Filter'] == filtername)
+                                 )
+                        assert match.sum() == 1
+                        handsel_row = handmeasured_offsets[match][0]
+                        dra_hand, ddec_hand = u.Quantity([handsel_row['dra (arcsec)'], handsel_row['ddec (arcsec)']], u.arcsec)
+                        ww.wcs.crval = ww.wcs.crval + [dra_hand.to(u.deg).value, ddec_hand.to(u.deg).value]
+                        raoffset = dra_hand
+                        decoffset = ddec_hand
+                    else:
+                        raoffset = 0*u.arcsec
+                        decoffset = 0*u.arcsec
 
                     if 'x' in cat.colnames:
                         skycrds_cat = ww.pixel_to_world(cat['x'], cat['y'])
@@ -183,85 +181,26 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
                     elif 'x_fit' in cat.colnames:
                         skycrds_cat = ww.pixel_to_world(cat['x_fit'], cat['y_fit'])
 
-                    max_offset = 0.2*u.arcsec
-                    med_dra = 100*u.arcsec
-                    med_ddec = 100*u.arcsec
-                    threshold = 0.01*u.arcsec
+                    flux_colname = 'flux' if 'flux' in cat.colnames else 'flux_fit'
+                    refflux_colname = 'flux' if 'flux' in reftb.colnames else 'flux_fit'
 
-                    sel = slice(None)
+                    (total_dra, total_ddec, med_dra, med_ddec,
+                     std_dra, std_ddec, keep, skykeep, reject, iteration) = measure_offsets(reference_coordinates,
+                                                                                            skycrds_cat,
+                                                                                            refflux=reftb[refflux_colname],
+                                                                                            skyflux=cat[flux_colname],
+                                                                                            sel=slice(None),
+                                                                                            verbose=True,
+                                                                                            filtername=filtername,
+                                                                                            ab=ab,
+                                                                                            expno=expno,
+                                                                                            total_dra=raoffset,
+                                                                                            total_ddec=decoffset,
+                                                                                            )
 
-                    idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat[sel], max_offset)
-                    dra = -(skycrds_cat[sel][idx].ra - reference_coordinates[sidx].ra).to(u.arcsec)
-                    ddec = -(skycrds_cat[sel][idx].dec - reference_coordinates[sidx].dec).to(u.arcsec)
-
-                    iteration = 0
-                    while np.abs(med_dra) > threshold or np.abs(med_ddec) > threshold:
-                        if 'x' in cat.colnames:
-                            skycrds_cat = ww.pixel_to_world(cat['x'], cat['y'])
-                        elif 'xcentroid' in cat.colnames:
-                            skycrds_cat = ww.pixel_to_world(cat['xcentroid'], cat['ycentroid'])
-                        elif 'x_fit' in cat.colnames:
-                            skycrds_cat = ww.pixel_to_world(cat['x_fit'], cat['y_fit'])
-
-
-                        idx, offset, _ = reference_coordinates.match_to_catalog_sky(skycrds_cat[sel])
-                        keep = offset < max_offset
-
-                        if 'flux' in cat.colnames:
-                            ratio = cat['flux'][idx[keep]] / reftb['flux'][keep]
-                        else:
-                            ratio = cat['flux_fit'][idx[keep]] / reftb['flux'][keep]
-                        reject = np.zeros(ratio.size, dtype='bool')
-                        ii = 0
-                        # rejecting based on flux may have failed?
-                        if filtername == 'F200W':
-                            # for the other filters, we don't expect any agreement at all
-                            for ii in range(4):
-                                madstd = stats.mad_std(ratio[~reject])
-                                med = np.median(ratio[~reject])
-                                reject = (ratio < med - 5 * madstd) | (ratio > med + 5 * madstd) | reject
-                                ratio = 1 / ratio
-                                madstd = stats.mad_std(ratio[~reject])
-                                med = np.median(ratio[~reject])
-                                reject = (ratio < med - 5 * madstd) | (ratio > med + 5 * madstd) | reject
-                                ratio = 1 / ratio
-
-                        # idx, sidx, sep, sep3d = reference_coordinates.search_around_sky(skycrds_cat[sel], max_offset)
-                        # dra = (skycrds_cat[sel][idx[keep]].ra - reference_coordinates[keep].ra).to(u.arcsec)
-                        # ddec = (skycrds_cat[sel][idx[keep]].dec - reference_coordinates[keep].dec).to(u.arcsec)
-
-                        # dra and ddec should be the vector added to CRVAL to put the image in the right place
-                        dra = -(skycrds_cat[sel][idx[keep][~reject]].ra - reference_coordinates[keep][~reject].ra).to(u.arcsec)
-                        ddec = -(skycrds_cat[sel][idx[keep][~reject]].dec - reference_coordinates[keep][~reject].dec).to(u.arcsec)
-
-                        med_dra = np.median(dra)
-                        med_ddec = np.median(ddec)
-                        std_dra = stats.mad_std(dra)
-                        std_ddec = stats.mad_std(ddec)
-
-                        if np.isnan(med_dra):
-                            print(f'len(refcoords) = {len(reference_coordinates)}')
-                            print(f'len(cat) = {len(cat)}')
-                            print(f'len(idx) = {len(idx)}')
-                            print(f'len(sidx) = {len(sidx)}')
-                            print(cat, sel, idx, sidx, sep)
-                            raise ValueError(f"median(dra) = {med_dra}.  np.nanmedian(dra) = {np.nanmedian(dra)}")
-
-                        total_dra = total_dra + med_dra.to(u.arcsec)
-                        total_ddec = total_ddec + med_ddec.to(u.arcsec)
-
-                        ww.wcs.crval = ww.wcs.crval + [med_dra.to(u.deg).value, med_ddec.to(u.deg).value]
-
-                        iteration += 1
-                        if iteration > 50:
-                            break # there is at least one case in which we converged to an oscillator
-                            raise ValueError("Iteration is not converging")
-
-                    print(f"{filtername:5s}, {ab:3s}, {expno:5s}, {total_dra:8.3f}, {total_ddec:8.3f}, {med_dra:8.3f}, {med_ddec:8.3f}, {std_dra:8.3f}, {std_ddec:8.3f}, {keep.sum():6d}, {reject.sum():7d}, niter={iteration:5d} [dra_hand={dra_hand}, ddec_hand={ddec_hand}]", flush=True)
-                    if keep.sum() < 5:
-                        print(fitsfn)
-                        print(fn)
-                        raise
+                    if np.sum(keep) < 5:
+                        print("FAILURE: ", fitsfn, fn)
+                        continue
 
                     rows.append({
                         'Filename': fn,
@@ -280,20 +219,37 @@ for reftbfn, reftbname in ((vvvfn, 'VVV'),
                         "Exposure": int(expno),
                         "Filter": filtername,
                         "Module": module,
+                        'ab': ab.strip('1234long'),
+                        "nmatch": keep.sum(),
+                        'RAOFF_hdr': raoffset,
+                        'DECOFF_hdr': decoffset,
                     })
 
     tbl = Table(rows)
     tbl.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_{reftbname}.csv", format='ascii.csv', overwrite=True)
-
-    # TODO: aggregate with weighted mean (or maybe we don't wnat that...)
 
     gr = tbl.group_by(['Filter', 'Module', 'Visit'])
     agg = gr.groups.aggregate(np.mean)
     del agg['Exposure']
     aggstd = gr.groups.aggregate(np.std)
     aggmed = gr.groups.aggregate(np.median)
+    aggsum = gr.groups.aggregate(np.sum)
     agg['dra_rms'] = aggstd['dra']
     agg['ddec_rms'] = aggstd['ddec']
     agg['dra_med'] = aggmed['dra']
     agg['ddec_med'] = aggmed['ddec']
+    agg['nmatch_sum'] = aggsum['nmatch']
     agg.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_{reftbname}_average.csv", format='ascii.csv', overwrite=True)
+
+    gr = tbl.group_by(['Filter', 'Visit'])
+    agg = gr.groups.aggregate(np.mean)
+    del agg['Exposure']
+    aggstd = gr.groups.aggregate(np.std)
+    aggmed = gr.groups.aggregate(np.median)
+    aggsum = gr.groups.aggregate(np.sum)
+    agg['dra_rms'] = aggstd['dra']
+    agg['ddec_rms'] = aggstd['ddec']
+    agg['dra_med'] = aggmed['dra']
+    agg['ddec_med'] = aggmed['ddec']
+    agg['nmatch_sum'] = aggsum['nmatch']
+    agg.write(f"{basepath}/offsets/Offsets_JWST_Brick1182_{reftbname}_average_lockmodules.csv", format='ascii.csv', overwrite=True)

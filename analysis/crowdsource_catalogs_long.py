@@ -56,15 +56,17 @@ pl.rcParams['image.origin'] = 'lower'
 import os
 print("Importing webbpsf", flush=True)
 import webbpsf
+print(f"Webbpsf version: {webbpsf.__version__}")
 from webbpsf.utils import to_griddedpsfmodel
 import datetime
+print("Done with imports", flush=True)
+
 
 def print(*args, **kwargs):
     now = datetime.datetime.now().isoformat()
     from builtins import print as printfunc
     return printfunc(f"{now}:", *args, **kwargs)
 
-print("Done with imports", flush=True)
 
 class WrappedPSFModel(crowdsource.psf.SimplePSF):
     """
@@ -215,7 +217,7 @@ def catalog_zoom_diagnostic(data, modsky, zoomcut, stars):
 
     axlims = pl.axis()
     if zoomcut[0].start:
-        #pl.axis([0,zoomcut[0].stop-zoomcut[0].start, 0, zoomcut[1].stop-zoomcut[1].start])
+        # pl.axis([0,zoomcut[0].stop-zoomcut[0].start, 0, zoomcut[1].stop-zoomcut[1].start])
         ok = ((stars['x'] >= zoomcut[1].start) &
               (stars['x'] <= zoomcut[1].stop) &
               (stars['y'] >= zoomcut[0].start) &
@@ -242,11 +244,74 @@ def catalog_zoom_diagnostic(data, modsky, zoomcut, stars):
     pl.tight_layout()
 
 
+def save_photutils_results(result, ww, filename,
+                           im1, detector,
+                           basepath, filtername, module, desat, bgsub, exposure_, visitid_,
+                           psf=None,
+                           blur=False,
+                           basic_or_iterative='basic',
+                           options=None,
+                           epsf_="",
+                           group="",
+                           fpsf=""):
+    print("Saving photutils results.")
+    blur_ = "_blur" if blur else ""
+
+    pixscale = (ww.proj_plane_pixel_area()**0.5).to(u.arcsec)
+    if 'x_fit' in result.colnames:
+        coords = ww.pixel_to_world(result['x_fit'], result['y_fit'])
+        result['skycoord_centroid'] = coords
+    elif 'xcentroid' in result.colnames:
+        coords = ww.pixel_to_world(result['xcentroid'], result['ycentroid'])
+        result['skycoord_centroid'] = coords
+    elif 'x_init' in result.colnames:
+        coords = ww.pixel_to_world(result['x_init'], result['y_init'])
+        result['skycoord_init'] = coords
+    else:
+        raise KeyError(f"No x value found in {result.colnames}")
+    print(f'len(result) = {len(result)}, len(coords) = {len(coords)}, type(result)={type(result)}', flush=True)
+    detector = "" # no detector #'s for long
+    if options.each_exposure:
+        result.meta['exposure'] = exposure_
+    if visitid_ is not None:
+        result.meta['visit'] = int(visitid_[-3:])
+    result.meta['filename'] = filename
+    result.meta['filter'] = filtername
+    result.meta['module'] = module
+    result.meta['detector'] = detector
+    result.meta['pixscale'] = pixscale.to(u.deg).value
+    result.meta['pixscale_as'] = pixscale.to(u.arcsec).value
+    result.meta['proposal_id'] = options.proposal_id
+
+    if 'RAOFFSET' in im1[0].header:
+        result.meta['RAOFFSET'] = im1[0].header['RAOFFSET']
+        result.meta['DEOFFSET'] = im1[0].header['DEOFFSET']
+    elif 'RAOFFSET' in im1[1].header:
+        result.meta['RAOFFSET'] = im1[1].header['RAOFFSET']
+        result.meta['DEOFFSET'] = im1[1].header['DEOFFSET']
+
+    if 'x_err' in result.colnames:
+        result['dra'] = result['x_err'] * pixscale
+        result['ddec'] = result['y_err'] * pixscale
+
+    tblfilename = f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{visitid_}{exposure_}{desat}{bgsub}{epsf_}{blur_}{group}_daophot_{basic_or_iterative}.fits"
+
+    result.write(tblfilename, overwrite=True)
+
+    print("tblfilename={tblfilename}, filename={filename}, suffix={suffix}, filtername={filtername}, module={module}, desat={desat}, bgsub={bgsub}, fpsf={fpsf} blur={blur}")
+
+    result.write(tblfilename, overwrite=True)
+    print(f"Completed {basic_or_iterative} photometry, and wrote out file {tblfilename}")
+
+    return result
+
+
 def save_crowdsource_results(results, ww, filename, suffix,
                              im1, detector,
                              basepath, filtername, module, desat, bgsub, exposure_, visitid_,
                              psf=None,
                              blur=False,
+                             options=None,
                              fpsf=""):
     print("Saving crowdsource results.")
     blur_ = "_blur" if blur else ""
@@ -269,9 +334,19 @@ def save_crowdsource_results(results, ww, filename, suffix,
     stars.meta['module'] = module
     stars.meta['detector'] = detector
     stars.meta['pixscale'] = pixscale.to(u.deg).value
-    stars.meta['pixscale_as'] = pixscale.value
+    stars.meta['pixscale_as'] = pixscale.to(u.arcsec).value
+    stars.meta['proposal_id'] = options.proposal_id
     if exposure_:
         stars.meta['exposure'] = exposure_
+    if visitid_:
+        stars.meta['visit'] = int(visitid_[-3:])
+
+    if 'RAOFFSET' in im1[0].header:
+        stars.meta['RAOFFSET'] = im1[0].header['RAOFFSET']
+        stars.meta['DEOFFSET'] = im1[0].header['DEOFFSET']
+    elif 'RAOFFSET' in im1[1].header:
+        stars.meta['RAOFFSET'] = im1[1].header['RAOFFSET']
+        stars.meta['DEOFFSET'] = im1[1].header['DEOFFSET']
 
     tblfilename = (f"{basepath}/{filtername}/"
                    f"{filtername.lower()}_{module}{visitid_}{exposure_}{desat}{bgsub}{fpsf}{blur_}"
@@ -286,7 +361,7 @@ def save_crowdsource_results(results, ww, filename, suffix,
     skymskyhdu = fits.PrimaryHDU(data=skymsky, header=im1[1].header)
     modskyhdu = fits.ImageHDU(data=modsky, header=im1[1].header)
     # PSF doesn't need saving / can't be saved, it's a function
-    #psfhdu = fits.ImageHDU(data=psf)
+    # psfhdu = fits.ImageHDU(data=psf)
     hdul = fits.HDUList([skymskyhdu, modskyhdu])
     hdul.writeto(f"{basepath}/{filtername}/{filtername.lower()}_{module}{visitid_}{exposure_}{desat}{bgsub}{fpsf}{blur_}_crowdsource_skymodel_{suffix}.fits", overwrite=True)
 
@@ -717,10 +792,22 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
     finstars['x'] = finstars['xcentroid']
     finstars['y'] = finstars['ycentroid']
     finstars['skycoord'] = ww.pixel_to_world(finstars['x'], finstars['y'])
-    # don't need to record fpsf or blur; they don't apply
-    finstars.write(f"{basepath}/{filtername}/"
-                   f"{filtername.lower()}_{module}{visitid_}{exposure_}{desat}{bgsub}"
-                   f"_daofind.fits", overwrite=True)
+
+    result = save_photutils_results(finstars, ww, filename,
+                                    im1=im1, detector=detector,
+                                    basepath=basepath,
+                                    filtername=filtername, module=module,
+                                    desat=desat, bgsub=bgsub,
+                                    blur="",
+                                    exposure_=exposure_,
+                                    visitid_=visitid_,
+                                    basic_or_iterative='daofind',
+                                    options=options,
+                                    epsf_="",
+                                    fpsf="",
+                                    group=group,
+                                    psf=None)
+
     stars = finstars # because I'm copy-pasting code...
 
     # Set up visualization
@@ -784,6 +871,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
                                              blur=options.blur,
                                              exposure_=exposure_,
                                              visitid_=visitid_,
+                                             options=options,
                                              suffix="unweighted", psf=None)
 
             zoomcut = slice(128, 256), slice(128, 256)
@@ -841,6 +929,7 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
                                                  exposure_=exposure_,
                                                  visitid_=visitid_,
                                                  psf=psf if refit_psf else None,
+                                                 options=options,
                                                  suffix=f"nsky{nsky}")
 
                 zoomcut = slice(128, 256), slice(128, 256)
@@ -934,24 +1023,19 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
         #bad = result['flux_fit'] <= 0
         #result = result[~bad]
 
-        coords = ww.pixel_to_world(result['x_fit'], result['y_fit'])
-        print(f'len(result) = {len(result)}, len(coords) = {len(coords)}, type(result)={type(result)}', flush=True)
-        result['skycoord_centroid'] = coords
-        detector = "" # no detector #'s for long
-        basic_daophot_catalog_fn = f"{basepath}/{filtername}/{filtername.lower()}_{module}{detector}{visitid_}{exposure_}{desat}{bgsub}{epsf_}{blur_}{group}_daophot_basic.fits"
-        if options.each_exposure:
-            result.meta['exposure'] = exposure_
-        result.meta['pixscale'] = (ww.proj_plane_pixel_area()**0.5).value
-        result.meta['pixscale_as'] = (ww.proj_plane_pixel_area()**0.5).to(u.arcsec).value
-        result.meta['filename'] = filename
-        result.meta['filter'] = filtername
-        result.meta['module'] = module
-        result.meta['detector'] = detector
-        result.meta['pixscale'] = pixscale.to(u.deg).value
-        result.meta['pixscale_as'] = pixscale.value
-
-        result.write(basic_daophot_catalog_fn, overwrite=True)
-        print(f"Completed BASIC photometry, and wrote out file {basic_daophot_catalog_fn}")
+        result = save_photutils_results(result, ww, filename,
+                                        im1=im1, detector=detector,
+                                        basepath=basepath,
+                                        filtername=filtername, module=module,
+                                        desat=desat, bgsub=bgsub,
+                                        blur=options.blur,
+                                        exposure_=exposure_,
+                                        visitid_=visitid_,
+                                        basic_or_iterative='basic',
+                                        options=options,
+                                        epsf_=epsf_,
+                                        group=group,
+                                        psf=None)
 
         stars = result
         stars['x'] = stars['x_fit']
@@ -1037,16 +1121,16 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
 
         # iterative takes for-ev-er
         phot_iter = IterativePSFPhotometry(finder=daofind_tuned,
-                                       localbkg_estimator=LocalBackground(5, 15),
-                                       grouper=grouper if options.group else None,
-                                       psf_model=dao_psf_model,
-                                       fitter=LevMarLSQFitter(),
-                                       maxiters=5,
-                                       fit_shape=(5, 5),
-                                       sub_shape=(15, 15),
-                                       aperture_radius=2*fwhm_pix,
-                                       progress_bar=True,
-                                      )
+                                           localbkg_estimator=LocalBackground(5, 15),
+                                           grouper=grouper if options.group else None,
+                                           psf_model=dao_psf_model,
+                                           fitter=LevMarLSQFitter(),
+                                           maxiters=5,
+                                           fit_shape=(5, 5),
+                                           sub_shape=(15, 15),
+                                           aperture_radius=2*fwhm_pix,
+                                           progress_bar=True,
+                                          )
 
         print("About to do ITERATIVE photometry....")
         result2 = phot_iter(data)
@@ -1056,24 +1140,20 @@ def do_photometry_step(options, filtername, module, detector, field, basepath,
         #bad = result2['flux_fit'] <= 0
         #result2 = result2[~bad]
 
-        coords2 = ww.pixel_to_world(result2['x_fit'], result2['y_fit'])
-        result2['skycoord_centroid'] = coords2
-        if options.each_exposure:
-            result2.meta['exposure'] = exposure_
-        result.meta['pixscale'] = (ww.proj_plane_pixel_area()**0.5).value
-        result.meta['pixscale_as'] = (ww.proj_plane_pixel_area()**0.5).to(u.arcsec).value
-        result.meta['filename'] = filename
-        result.meta['filter'] = filtername
-        result.meta['module'] = module
-        result.meta['detector'] = detector
-        result.meta['pixscale'] = pixscale.to(u.deg).value
-        result.meta['pixscale_as'] = pixscale.value
+        result2 = save_photutils_results(result2, ww, filename,
+                                         im1=im1, detector=detector,
+                                         basepath=basepath,
+                                         filtername=filtername, module=module,
+                                         desat=desat, bgsub=bgsub,
+                                         blur=options.blur,
+                                         exposure_=exposure_,
+                                         visitid_=visitid_,
+                                         basic_or_iterative='iterative',
+                                         options=options,
+                                         epsf_=epsf_,
+                                         group=group,
+                                         psf=None)
 
-        print(f'len(result2) = {len(result2)}, len(coords) = {len(coords2)}', flush=True)
-        result2.write(f"{basepath}/{filtername}/{filtername.lower()}"
-                      f"_{module}{detector}{visitid_}{exposure_}{desat}{bgsub}{epsf_}{blur_}{group}"
-                      f"_daophot_iterative.fits", overwrite=True)
-        print("Saved iterative catalog")
         stars = result2
         stars['x'] = stars['x_fit']
         stars['y'] = stars['y_fit']

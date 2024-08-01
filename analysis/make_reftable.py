@@ -1,4 +1,5 @@
 import datetime
+import warnings
 
 from astropy import units as u
 from astropy.table import Table
@@ -8,98 +9,103 @@ from astroquery.svo_fps import SvoFps
 from astropy import wcs
 from astropy.io import fits
 import numpy as np
+import sys
 
 from astropy import stats
 
+try:
+    from measure_offsets import measure_offsets
+except ImportError:
+    sys.path.append('/blue/adamginsburg/adamginsburg/jwst/brick/offsets')
+    from measure_offsets import measure_offsets
 
-def main(basepath = '/orange/adamginsburg/jwst/cloudc/'):
+
+#def main(basepath = '/orange/adamginsburg/jwst/cloudc/'):
+def main(return_method=None, return_filter=None):
     """
     June 28, 2023: decided to switch to F405N-only reference
     """
     #basepath = '/blue/adamginsburg/adamginsburg/jwst/brick/'
 
-    tblfilename = (f'{basepath}/catalogs/f405n_merged_indivexp_merged_crowdsource_nsky0.fits')
-    tbl = Table.read(tblfilename)
+    for filtername, vvvcatfn in zip(('f405n', 'f444w', 'f200w',),
+                                    ('F405N/pipeline/jw02221-o001_t001_nircam_clear-f405n-merged_vvvcat.ecsv',
+                                     'catalogs/jw01182_VVV_reference_catalog.ecsv',
+                                     'catalogs/jw01182_VVV_reference_catalog.ecsv',
+                                     )):
+        print()
+        print(filtername)
+        for tblfilename, method in zip((f'{basepath}/catalogs/{filtername}_merged_indivexp_merged_crowdsource_nsky0.fits',
+                                        f'{basepath}/catalogs/{filtername}_merged_indivexp_merged_dao_basic.fits'),
+                                       ('crowdsource', 'dao_basic')):
+            print(method, tblfilename)
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                tbl = Table.read(tblfilename)
 
-    try:
-        sel = ((tbl['qf'] > 0.95) & (tbl['spread_model'] < 0.25) & (tbl['fracflux'] > 0.9) & (tbl['flux'] > 0))
-    except KeyError:
-        sel = ((tbl['qf'] > 0.95) & (tbl['fracflux'] > 0.9) & (tbl['flux'] > 0))
+            if 'qf' in tbl.colnames:
+                flux_colname = 'flux'
+                sel = ((tbl['qf'] > 0.95) & (tbl['spread_model'] < 0.25) & (tbl['fracflux'] > 0.9) & (tbl[flux_colname] > 0))
+            elif 'qfit' in tbl.colnames:
+                flux_colname = 'flux_fit'
+                sel = ((tbl['qfit'] < 0.1) & (tbl['cfit'] < 0.1) & (tbl[flux_colname] > 0)) & (np.isfinite(tbl['skycoord'].ra) & np.isfinite(tbl['skycoord'].dec))
 
-    print(f"QFs are good for {sel.sum()} out of {len(tbl)} catalog entries")
-    print(f"Making the reference catalog from {sel.sum()} out of {len(tbl)} catalog entries")
+            print(f"QFs are good for {sel.sum()} out of {len(tbl)} catalog entries")
+            print(f"Making the reference catalog from {sel.sum()} out of {len(tbl)} catalog entries")
 
-    reftbl = tbl['skycoord', 'flux' ][sel]
+            reftbl = tbl['skycoord', flux_colname][sel]
+            refcrds = reftbl['skycoord']
+            assert not np.any(np.isnan(refcrds.ra))
 
-    # Crossmatch to VVV and recenter
-    vvvtb = Table.read(f'{basepath}/F405N/pipeline/jw02221-o001_t001_nircam_clear-f405n-merged_vvvcat.ecsv')
-    vvvcrds = SkyCoord(vvvtb['RAJ2000'].quantity, vvvtb['DEJ2000'].quantity, frame='fk5')
-    refcrds = reftbl['skycoord']
+            # Crossmatch to VVV and recenter
+            vvvtb = Table.read(f'{basepath}/{vvvcatfn}')
+            vvvtb = vvvtb[np.isfinite(vvvtb['RAJ2000']) & np.isfinite(vvvtb['DEJ2000'])]
+            vvvcrds = SkyCoord(vvvtb['RAJ2000'].quantity, vvvtb['DEJ2000'].quantity, frame='fk5')
 
-    jfilts = SvoFps.get_filter_list('JWST')
-    jfilts.add_index('filterID')
-    zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.F405N']['ZeroPoint'], u.Jy)
-    #sqpixscale = wcs.WCS(fits.getheader(reftbl.meta['FILENAME'], ext=1)).proj_plane_pixel_area()
-    flux_jy = (reftbl['flux'] * u.MJy/u.sr * (reftbl.meta['pixscale_as']*u.arcsec)**2).to(u.Jy)
-    mag405 = -2.5 * np.log10(flux_jy / zeropoint) * u.mag
+            jfilts = SvoFps.get_filter_list('JWST')
+            jfilts.add_index('filterID')
+            zeropoint = u.Quantity(jfilts.loc[f'JWST/NIRCam.{filtername.upper()}']['ZeroPoint'], u.Jy)
+            # sqpixscale = wcs.WCS(fits.getheader(reftbl.meta['FILENAME'], ext=1)).proj_plane_pixel_area()
+            flux_jy = (reftbl[flux_colname] * u.MJy/u.sr * (reftbl.meta['pixscale_as']*u.arcsec)**2).to(u.Jy)
+            mag_jw = -2.5 * np.log10(flux_jy / zeropoint) * u.mag
 
-    total_dra, total_ddec = 0*u.arcsec, 0*u.arcsec
+            (total_dra, total_ddec, med_dra, med_ddec, std_dra,
+             std_ddec, keep, skykeep, reject, iteration) = measure_offsets(reference_coordinates=vvvcrds,
+                                                                           skycrds_cat=refcrds,
+                                                                           refflux=10**vvvtb['Ksmag3'],
+                                                                           skyflux=10**mag_jw.value,
+                                                                           sel=slice(None),
+                                                                           verbose=True,
+                                                                           )
 
-    for ii in range(8):
-        keep = np.zeros(len(reftbl), dtype='bool')
-        idx, sidx, sep, _ = refcrds.search_around_sky(vvvcrds, 0.2*u.arcsec)
+            refcrds_updated = SkyCoord(refcrds.ra + total_dra, refcrds.dec + total_ddec, frame=refcrds.frame)
 
-        is_closest = np.array([(ii == idx).sum() == 1 or (sp == sep[idx == ii].min()) for ii, sp in zip(idx, sep)])
-        idx = idx[is_closest]
-        sidx = sidx[is_closest]
+            reftbl['VVV_matched'] = skykeep
 
-        # magnitude difference = ratio
-        ratio = vvvtb['Ksmag3'][idx] - mag405[sidx]
-        reject = np.zeros(ratio.size, dtype='bool')
-        for jj in range(12):
-            madstd = stats.mad_std(ratio[~reject])
-            med = np.median(ratio[~reject])
-            reject = (ratio < med - 3 * madstd) | (ratio > med + 3 * madstd) | reject
-            ratio = 1 / ratio
-            madstd = stats.mad_std(ratio[~reject])
-            med = np.median(ratio[~reject])
-            reject = (ratio < med - 3 * madstd) | (ratio > med + 3 * madstd) | reject
-            ratio = 1 / ratio
+            print(f"Shifted {filtername} coordinates by {total_dra}, {total_ddec} in {iteration} iterations with stddev = {std_dra}, {std_ddec}"
+                  f" ({(std_dra**2+std_ddec**2)**0.5})")
+            print(f"Total of {keep.sum()} stars were used.")
+            reftbl['skycoord'] = refcrds_updated
 
-        keep[sidx[~reject]] = True
-        dra = (refcrds[sidx].ra - vvvcrds[idx].ra).to(u.arcsec)
-        ddec = (refcrds[sidx].dec - vvvcrds[idx].dec).to(u.arcsec)
-        dra_med, ddec_med = np.median(dra[~reject]), np.median(ddec[~reject])
-        print(f"{len(idx)} VVV matches in f405n catalog.  ", end='')
-        print(f'ratio = {med} +/- {madstd}   nkeep={(~reject).sum()}.  dra, ddec median = {dra_med}, {ddec_med}')
-        total_dra += dra_med
-        total_ddec += ddec_med
+            # include two columns to make it a table, plus abmag for sorting
+            reftbl['RA'] = reftbl['skycoord'].ra
+            reftbl['DEC'] = reftbl['skycoord'].dec
+            reftbl.sort(flux_colname, reverse=True) # descending
 
-        refcrds_updated = SkyCoord(refcrds.ra - dra_med, refcrds.dec - ddec_med, frame=refcrds.frame)
-        refcrds = refcrds_updated
+            reftbl.meta['VERSION'] = datetime.datetime.now().isoformat()
+            if 'VERSION' in tbl.meta:
+                reftbl.meta['PARENT_VERSION'] = tbl.meta['VERSION']
+                reftbl.meta['RAOFFSET'] = total_dra
+                reftbl.meta['DECOFFSET'] = total_ddec
 
-        reftbl['VVV_matched'] = keep
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                reftbl.write(f'{basepath}/catalogs/{method}_based_nircam-{filtername}_reference_astrometric_catalog.ecsv', overwrite=True)
+                reftbl.write(f'{basepath}/catalogs/{method}_based_nircam-{filtername}_reference_astrometric_catalog.fits', overwrite=True)
 
-        if (np.abs(dra_med) < 1*u.marcsec) & (np.abs(ddec_med) < 1*u.marcsec):
-            break
-
-    print(f"Shifted F405N coordinates by {total_dra}, {total_ddec} in {ii} iterations with stddev = {dra.std()}, {ddec.std()} ({(dra.var()+ddec.var())**0.5})")
-    reftbl['skycoord'] = refcrds_updated
-
-    # include two columns to make it a table, plus abmag for sorting
-    reftbl['RA'] = reftbl['skycoord'].ra
-    reftbl['DEC'] = reftbl['skycoord'].dec
-    reftbl.sort('flux', reverse=True) # descending
-
-    reftbl.meta['VERSION'] = datetime.datetime.now().isoformat()
-    if 'VERSION' in tbl.meta:
-        reftbl.meta['PARENT_VERSION'] = tbl.meta['VERSION']
-        reftbl.meta['RAOFFSET'] = total_dra
-        reftbl.meta['DECOFFSET'] = total_ddec
-
-    reftbl.write(f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.ecsv', overwrite=True)
-    reftbl.write(f'{basepath}/catalogs/crowdsource_based_nircam-f405n_reference_astrometric_catalog.fits', overwrite=True)
-
+            if return_method == method:
+                return reftbl
+        if return_filter == filtername:
+            return reftbl
     return reftbl
 
 
@@ -123,24 +129,24 @@ def main_old():
 
     # reject sources with bad QFs
     goodqflong = ((tbl['qf_f410m'] > 0.90) |
-                  (tbl['qf_f405n'] > 0.90) |
-                  (tbl['qf_f466n'] > 0.90))
+                (tbl['qf_f405n'] > 0.90) |
+                (tbl['qf_f466n'] > 0.90))
     goodspreadlong = ((tbl['spread_model_f410m'] < 0.25) |
-                      (tbl['spread_model_f405n'] < 0.25) |
-                      (tbl['spread_model_f466n'] < 0.25))
+                    (tbl['spread_model_f405n'] < 0.25) |
+                    (tbl['spread_model_f466n'] < 0.25))
     goodfracfluxlong = ((tbl['fracflux_f410m'] > 0.8) |
                         (tbl['fracflux_f405n'] > 0.8) &
                         (tbl['fracflux_f466n'] > 0.8))
 
     any_saturated_ = [(tbl[f'near_saturated_{x}_{x}'] &
-                      ~tbl[f'flux_{x}'].mask)
-                      for x in long_filternames]
+                    ~tbl[f'flux_{x}'].mask)
+                    for x in long_filternames]
     any_saturated = any_saturated_[0]
     for col in any_saturated_[1:]:
         any_saturated = any_saturated | col
 
     any_replaced_saturated_ = [tbl[f'replaced_saturated_{x}'] &
-                               ~tbl[f'flux_{x}'].mask for x in long_filternames]
+                            ~tbl[f'flux_{x}'].mask for x in long_filternames]
     any_replaced_saturated = any_replaced_saturated_[0]
     for col in any_replaced_saturated_[1:]:
         any_replaced_saturated = any_replaced_saturated | col
@@ -163,8 +169,8 @@ def main_old():
     reftbl.meta['VERSION'] = datetime.datetime.now().isoformat()
     reftbl.meta['PARENT_VERSION'] = tbl.meta['VERSION']
 
-    reftbl.write(f'{basepath}/catalogs/crowdsource_based_nircam-long_reference_astrometric_catalog.ecsv', overwrite=True)
-    reftbl.write(f'{basepath}/catalogs/crowdsource_based_nircam-long_reference_astrometric_catalog.fits', overwrite=True)
+    reftbl.write(f'{basepath}/catalogs/{method}_based_nircam-long_reference_astrometric_catalog.ecsv', overwrite=True)
+    reftbl.write(f'{basepath}/catalogs/{method}_based_nircam-long_reference_astrometric_catalog.fits', overwrite=True)
 
     return reftbl
 

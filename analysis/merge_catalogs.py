@@ -23,6 +23,7 @@ from astropy import units as u
 from astroquery.svo_fps import SvoFps
 from astropy.stats import sigma_clip, mad_std
 import dask
+import dask.array
 
 from tqdm.auto import tqdm
 
@@ -111,14 +112,80 @@ def nanaverage_dask(data, weights, **kwargs):
     return avg.compute()
 
 
+def shift_individual_catalog(tbl, offsets_table, verbose=True):
+    """
+    offsets_table:
+        A table to use to re-calculate sky coordinates from the WCS after
+        shifting it.  This can be used because the catalogs are all
+        intrinsically in pixel space, so changing the shift after the fact is OK.
+        Using an offset table enables splitting out the re-alignment task from
+        here; I want to be able to measure the alignment and be sure it's right
+        before applying it.
+    """
+    if 'Visit' in tbl.meta:
+        visit = int(tbl.meta['Visit'])
+    elif 'VISIT' in tbl.meta:
+        visit = int(tbl.meta['VISIT'])
+    elif 'visit' in tbl.meta:
+        visit = int(tbl.meta['visit'])
+    else:
+        print(tbl.meta)
+        raise KeyError("'Visit' not found in meta")
+    exposure = int(tbl.meta['EXPOSURE'][-5:])
+    thismodule = tbl.meta['MODULE']
+    if thismodule.endswith('a') or thismodule.endswith('b'):
+        thismodule = thismodule+'long'
+    filtername = tbl.meta['FILTER']
+
+    offsets_visit_number = np.array([int(vis[-3:]) for vis in offsets_table['Visit']])
+
+    match = ((offsets_visit_number == visit) &
+             (offsets_table['Exposure'] == exposure) &
+             ((offsets_table['Module'] == thismodule) | (offsets_table['Module'] == thismodule.strip('1234'))) &
+             (offsets_table['Filter'] == filtername)
+             )
+
+    assert match.sum() == 1
+    row = offsets_table[match]
+
+    raoffset = tbl.meta['RAOFFSET'] * u.arcsec
+    decoffset = tbl.meta['DEOFFSET'] * u.arcsec
+
+    dra = row['dra'][0]*u.arcsec
+    ddec = row['ddec'][0]*u.arcsec
+
+    skycoord_colname = 'skycoord' if 'skycoord' in tbl.colnames else 'skycoord_centroid'
+
+    skycoord = tbl[skycoord_colname]
+    skycoord = SkyCoord(ra=skycoord.ra - raoffset + dra, dec=skycoord.dec - decoffset + ddec, frame=skycoord.frame)
+    tbl[skycoord_colname] = skycoord
+
+    print(f"Shifted table from {raoffset:0.4f},{decoffset:0.4f} to {dra:0.4f},{ddec:0.4f}, a difference of {dra-raoffset:0.4f},{ddec-decoffset:0.4f}")
+
+    return tbl
+
+
 def combine_singleframe(tbls, max_offset=0.10 * u.arcsec, realign=False, nanaverage=nanaverage_dask,
                         min_offset=0.01*u.arcsec,
+                        offsets_table=None,
+                        verbose=True
                         ):
     """
 
-    min_offset : 
+    min_offset :
         The minimum allowed offset to declare a 'new' star.  Anything below this is assumed same star.
+
+    offsets_table:
+        A table to use to re-calculate sky coordinates from the WCS after
+        shifting it.  This can be used because the catalogs are all
+        intrinsically in pixel space, so changing the shift after the fact is OK.
+        Using an offset table enables splitting out the re-alignment task from
+        here; I want to be able to measure the alignment and be sure it's right
+        before applying it.
     """
+    if offsets_table is not None:
+        tbls = [shift_individual_catalog(tbl, offsets_table, verbose=verbose) for tbl in tbls]
+
     # set up DAO vs crowd column names
     if 'qf' in tbls[0].colnames:
         qfcn = 'qf'
@@ -154,7 +221,7 @@ def combine_singleframe(tbls, max_offset=0.10 * u.arcsec, realign=False, nanaver
 
             newcrds = crds[keep]
             basecrds = SkyCoord([basecrds, newcrds])
-            print(f"Added {len(newcrds)} new sources in exposure {tbl.meta['exposure']} {tbl.meta['MODULE'] if 'MODULE' in tbl.meta else ''}")
+            print(f"Added {len(newcrds)} new sources in exposure {tbl.meta['exposure']} {tbl.meta['MODULE'] if 'MODULE' in tbl.meta else ''} [total={len(basecrds)}]")
             # f" ({mutual_matches.sum()} mutual matches ({(~mutual_matches).sum()} not), {(sep > max_offset).sum()} above {max_offset}, keeping {keep.sum()}), ", flush=True)
         print(f"Iteration {ii}: There are a total of {len(basecrds)} sources in the base coordinate list [method={'dao' if dao else 'crowdsource'}]")
 
@@ -204,7 +271,7 @@ def combine_singleframe(tbls, max_offset=0.10 * u.arcsec, realign=False, nanaver
             ddec_header = fh['SCI'].header['DEOFFSET']
 
         print(f"Exposure {tbl.meta['exposure']} {tbl.meta['MODULE' if 'MODULE' in tbl.meta else '']} was offset by {medsep_ra.to(u.marcsec):10.3f}+/-{dmedsep_ra.to(u.marcsec):7.3f},"
-              f" {medsep_dec.to(u.marcsec):10.3f}+/-{dmedsep_dec.to(u.marcsec):7.3f} based on {oksep.sum()} matches.  dra={dra_header:7.3g} ddec={ddec_header:7.3g}")
+              f" {medsep_dec.to(u.marcsec):10.3f}+/-{dmedsep_dec.to(u.marcsec):7.3f} based on {oksep.sum()} matches.  dra={dra_header:7.5g} ddec={ddec_header:7.5g}")
 
         # for tbl0, should be nan (all self-match)
         if realign and not np.isnan(medsep_ra) and not np.isnan(medsep_dec):
@@ -258,7 +325,7 @@ def combine_singleframe(tbls, max_offset=0.10 * u.arcsec, realign=False, nanaver
                 arrays[key][match_inds[keep], ii] = tbl[key][keep]
         arrays['ra'][match_inds[keep], ii] = tbl[skycoord_colname].ra[keep]
         arrays['dec'][match_inds[keep], ii] = tbl[skycoord_colname].dec[keep]
-        print(f"{ii}: Added {keep.sum()} of {len(keep)} sources from exposure {tbl.meta['exposure']} {tbl.meta['MODULE'] if 'MODULE' in tbl.meta else ''}", flush=True)
+        print(f"{ii}: Added {keep.sum()} of {len(keep)} sources from exposure {tbl.meta['exposure']} {tbl.meta['MODULE'] if 'MODULE' in tbl.meta else ''} [total={len(basecrds)}]", flush=True)
 
     print("Compiling arrays into table", flush=True)
     print(f"Column names are {arrays.keys()} and should be {column_names}", flush=True)
@@ -517,7 +584,7 @@ def merge_catalogs(tbls, catalog_type='crowdsource', module='nrca',
         indivexp = '_indivexp' if indivexp else ''
         tablename = f"{basepath}/catalogs/{catalog_type}_{module}{indivexp}_photometry_tables_merged{desat}{bgsub}{epsf_}{blur_}"
         t0 = time.time()
-        print(f"Writing table {tablename} with len={len(basetable)}", flush=True)
+        print(f"Writing table {tablename} with len={len(basetable)} and ncols={len(basetable.colnames)}", flush=True)
         # use caps b/c FITS will force it to caps anyway
         basetable.meta['VERSION'] = datetime.datetime.now().isoformat()
         # DO NOT USE FITS in production, it drops critical metadata
@@ -570,6 +637,7 @@ def merge_individual_frames(module='merged', suffix="", desat=False, filtername=
                                         exposure_numbers=np.arange(1, 25),
                                         max_visitid=10,
                                         method='crowdsource',
+                                        offsets_table=None,
                                         basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
 
     desat = "_unsatstar" if desat else ""
@@ -587,9 +655,9 @@ def merge_individual_frames(module='merged', suffix="", desat=False, filtername=
         column_names = ('flux', flux_error_colname, 'skycoord', 'qf', 'rchi2', 'fracflux', 'fwhm', 'fluxiso', 'spread_model')
         method_suffix = 'crowdsource'
         # flux_colname = 'flux_fit'
-    elif method == 'dao':
+    elif method in ('dao', 'daophot', 'basic', 'daobasic', 'iterative', 'daoiterative'):
         flux_error_colname = 'flux_err'
-        column_names = ('flux_fit', flux_error_colname, 'skycoord', 'qfit', 'cfit', 'flux_init', 'flags', 'local_bkg', 'iter_detected', 'group_id', 'group_size')
+        column_names = ('flux_fit', flux_error_colname, 'skycoord', 'qfit', 'cfit', 'flux_init', 'flags', 'local_bkg', 'iter_detected', 'group_size')
         # flux_colname = 'flux'
         method_suffix = 'daophot'
     else:
@@ -615,8 +683,11 @@ def merge_individual_frames(module='merged', suffix="", desat=False, filtername=
     for tb, fn in zip(tables, tblfns):
         if 'exposure' not in tb.meta:
             tb.meta['exposure'] = fn.split("_exp")[-1][:5]
+        if 'FILENAME' not in tb.meta:
+            print('tb.meta:', tb.meta)
+            raise ValueError(f"Table file {fn} is not correctly formatted; it is missing FILENAME metadata")
 
-    merged_exposure_table = combine_singleframe(tables)
+    merged_exposure_table = combine_singleframe(tables, offsets_table=offsets_table)
 
     outfn = f"{basepath}/catalogs/{filtername.lower()}_{module}_indivexp_merged{desat}{bgsub}{fitpsf}{blur_}_{method}{suffix}_allcols.fits"
     print(f"Writing {outfn} with length {len(merged_exposure_table)}")
@@ -625,9 +696,9 @@ def merge_individual_frames(module='merged', suffix="", desat=False, filtername=
     # make a table that is nearly equivalent to standard tables (with no 'x' or 'y' coordinate)
     minimal_version = {colname: merged_exposure_table[f'{colname}_avg']
                        for colname in column_names if f'{colname}_avg' in merged_exposure_table.colnames}
-    for key in ('dra', 'ddec', 'std_ra', 'std_dec', 'nmatch', 'nmatch_good', f'{flux_error_colname}_prop'):
+    for key in ('dra_avg', 'ddec_avg', 'std_ra', 'std_dec', 'nmatch', 'nmatch_good', f'{flux_error_colname}_prop'):
         if key in merged_exposure_table.colnames:
-            minimal_version[key] = merged_exposure_table[key]
+            minimal_version[key.split("_avg")[0]] = merged_exposure_table[key]
 
     minimal_table = Table(minimal_version)
     minimal_table.meta = merged_exposure_table.meta.copy()
@@ -643,11 +714,15 @@ def merge_individual_frames(module='merged', suffix="", desat=False, filtername=
     print(f"Final table length is {len(minimal_table)}.  Writing {outfn}")
     minimal_table.write(outfn, overwrite=True)
 
+    for colname in minimal_table.colnames:
+        assert minimal_table[colname].ndim == 1
+
     return minimal_table
 
 
 def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False,
                       epsf=False, fitpsf=False, blur=False, target='brick',
+                      min_qf=0.75,
                       indivexp=False,
                       basepath='/blue/adamginsburg/adamginsburg/jwst/brick/'):
     if epsf:
@@ -698,7 +773,14 @@ def merge_crowdsource(module='nrca', suffix="", desat=False, bgsub=False,
 
     for catfn in catfns:
         print(catfn, getmtime(catfn))
-    tbls = [Table.read(catfn) for catfn in tqdm(catfns, desc='Reading Tables')]
+
+    # added a fq cut at read time to reduce memory usage during merge
+    def read_cat(catfn, min_qf=min_qf):
+        tbl = Table.read(catfn)
+        if min_qf is not None:
+            tbl = tbl[tbl['qf'] > min_qf]
+        return tbl
+    tbls = [read_cat(catfn) for catfn in tqdm(catfns, desc='Reading Tables')]
 
     for catfn, tbl in zip(catfns, tbls):
         tbl.meta['filename'] = catfn
@@ -1063,7 +1145,7 @@ def main():
     parser.add_option("--make-refcat", dest='make_refcat', default=False,
                       action='store_true')
     parser.add_option('--max-expnum', dest='max_expnum', default=24, type='int')
-    parser.add_option('--indiv-merge_methods', dest='indiv_merge_methods', default='dao,crowdsource,daoiterative')
+    parser.add_option('--indiv-merge-methods', dest='indiv_merge_methods', default='dao,crowdsource,daoiterative')
     (options, args) = parser.parse_args()
 
     modules = options.modules.split(",")
@@ -1072,6 +1154,9 @@ def main():
     print("Options:", options)
 
     basepath = f'/blue/adamginsburg/adamginsburg/jwst/{target}/'
+
+    offsets_tables = {'1182': Table.read(f'{basepath}/offsets/Offsets_JWST_Brick1182_F444ref.csv'),
+                      '2221': None}
 
     # need to have incrementing _before_ test
     index = -1
@@ -1103,6 +1188,7 @@ def main():
                                             suffix = {'crowdsource': '_nsky0',
                                                       'dao': '_basic',
                                                       'daoiterative': '_iterative',
+                                                      'iterative': '_iterative',
                                                       }[method]
                                             merge_individual_frames(module=module,
                                                                     desat=desat,
@@ -1115,6 +1201,7 @@ def main():
                                                                     suffix=suffix,
                                                                     target=target,
                                                                     exposure_numbers=np.arange(1, options.max_expnum + 1),
+                                                                    offsets_table=offsets_tables[progid],
                                                                     method=method,
                                                                     basepath=basepath)
                                             print(f"Finished merge_individual_frames {suffix} {progid} {filtername} {method}")
